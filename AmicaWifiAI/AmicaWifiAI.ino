@@ -6,8 +6,8 @@
 
 
 int status = WL_IDLE_STATUS;
-const char *ssid = "AIWifi";    //  your network SSID (name)
-const char *password = "AIWifi";  // your network password
+const char *ssid = "ESPap";
+const char *password = "thereisnospoon";
 
 ESP8266WebServer server(80);
 
@@ -59,7 +59,9 @@ void setup()
 
   if (status != WL_CONNECTED) {
     Serial.print("Configuring access point...");
-    WiFi.softAP(ssid, password);
+    /* You can remove the password parameter if you want the AP to be open. */
+     char ssid_char[ssid.length() + 1];
+    WiFi.softAP(ssid_char);
 
     IPAddress myIP = WiFi.softAPIP();
     Serial.print("AP IP address: ");
