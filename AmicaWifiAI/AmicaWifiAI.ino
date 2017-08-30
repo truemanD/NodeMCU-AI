@@ -3,6 +3,7 @@
 
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
+#include <ESP8266HTTPClient.h>
 
 
 int status = WL_IDLE_STATUS;
@@ -38,7 +39,7 @@ void loop()
       createAccessPoint();
     }
     if (privateSsid.length() == 0) {
-            scanAndConnectToNetwork();
+      scanAndConnectToNetwork();
     } else {
       connectToWifi(privateSsid, privatePassword);
       privateSsid = "";
@@ -48,6 +49,7 @@ void loop()
     if (statusAP == 1) {
       disableAccessPoint();
     }
+    http_client();
   }
 
   blink_status();
@@ -69,7 +71,7 @@ void disableAccessPoint() {
   Serial.println(ownSsid);
   WiFi.softAPdisconnect(true);
   statusAP = 0;
-  Serial.print("ESP AccessPoint disabled");
+  Serial.println("ESP AccessPoint disabled");
 }
 
 void configureWebPage() {
@@ -188,5 +190,23 @@ void blink_status() {
   } else {
     digitalWrite(pin, HIGH);
   }
+}
+
+void http_client() {
+  HTTPClient http;
+  String message = "Hello from ESP8266";
+  http.begin("https://www.google.ru/");
+  http.addHeader("Content-Type", "text/html");
+  int httpCode = http.POST(message);
+  if (httpCode > 0) {
+    Serial.printf("[HTTP] POST... code: %d\n", httpCode);
+    if (httpCode == HTTP_CODE_OK) {
+      String payload = http.getString();
+      Serial.println(payload);
+    }
+  } else {
+    Serial.printf("[HTTP] POST... failed, error: %s\n", http.errorToString(httpCode).c_str());
+  }
+  http.end();
 }
 
