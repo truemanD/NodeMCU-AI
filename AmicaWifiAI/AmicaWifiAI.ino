@@ -11,6 +11,7 @@ const char ownSsid[] = "SmartHome";
 const char ownPassword[] = "SmartHomeModule";
 String privateSsid;
 String privatePassword;
+String moduleType;
 
 ESP8266WebServer server(80);
 const int pin = 13;
@@ -37,7 +38,7 @@ void loop()
       createAccessPoint();
     }
     if (privateSsid.length() == 0) {
-      scanAndConnectToNetwork();
+            scanAndConnectToNetwork();
     } else {
       connectToWifi(privateSsid, privatePassword);
       privateSsid = "";
@@ -54,7 +55,7 @@ void loop()
 }
 
 void createAccessPoint() {
-  Serial.print("Configuring access point for wifi network ...");
+  Serial.print("Configuring access point for wifi network: ");
   Serial.println(ownSsid);
   WiFi.softAP(ownSsid, ownPassword);
   statusAP = 1;
@@ -64,7 +65,7 @@ void createAccessPoint() {
 }
 
 void disableAccessPoint() {
-  Serial.print("Disabling access point ...");
+  Serial.print("Disabling access point: ");
   Serial.println(ownSsid);
   WiFi.softAPdisconnect(true);
   statusAP = 0;
@@ -72,8 +73,24 @@ void disableAccessPoint() {
 }
 
 void configureWebPage() {
-  webPage += "<h1>ESP8266 Web Server</h1><p>Bercut<a href=\"network?ssid=Bercut&amp;password=Rhbdtnrj123\"><button>Bercut</button></a>";
-  webPage += "<p>Reset<a href=\"reset\"><button>Reset</button></a>";
+  webPage += "<html>\n"
+             "    <body>\n"
+             "        <FORM name=\"network\" action = \"/network\" method=\"post\">\n"
+             "            Network params:<br>\n"
+             "            <p> <INPUT type=\"text\" name=\"ssid\"> SSID<BR>\n"
+             "            </p>\n"
+             "            <p><INPUT type=\"password\" name=\"password\"> Password<BR></p>\n"
+             "            <p>Module type</p>\n"
+             "            <p><input type=\"radio\" name=\"module\" value=\"temperature\">temperature<Br>\n"
+             "                <input type=\"radio\" name=\"module\" value=\"humidity\">humidity<Br>\n"
+             "                <input type=\"radio\" name=\"module\" value=\"motion\">motion</p>\n"
+             "            <p><INPUT type =\"submit\" value=\"update\"></p>\n"
+             "        </FORM>\n"
+             "        <FORM name=\"reset\" action = \"/reset\" method=\"post\">\n"
+             "            <p><INPUT type =\"reset\" value=\"reset\"></p>\n"
+             "        </FORM>\n"
+             "    </body>\n"
+             "</html>";
 }
 
 void startServer() {
@@ -83,24 +100,25 @@ void startServer() {
     delay(1000);
   });
   server.on("/network", []() {
+    Serial.println("network -> get request params");
     for (int i = 0; i <   server.args(); i++ ) {
-      Serial.print(server.argName(i) + ":" + server.arg(i));
+      Serial.println(server.argName(i) + ":" + server.arg(i));
     }
     privateSsid = server.arg("ssid");
     privatePassword = server.arg("password");
-    String result = privateSsid + ":" + privatePassword;
-    Serial.println(result);
-    result = result + "\n" + webPage;
-    server.send(200, "text/plain", result);
+    moduleType = server.arg("module");
+    String result = webPage + "\nAttempting to connect to SSID: " + privateSsid;
+    server.send(200, "text/html", result);
     delay(1000);
   });
   server.on("/reset", []() {
+    Serial.println("reset -> get request params");
+    for (int i = 0; i <   server.args(); i++ ) {
+      Serial.println(server.argName(i) + ":" + server.arg(i));
+    }
     privateSsid = "";
     privatePassword = "";
-    String result = privateSsid + ":" + privatePassword;
-    Serial.println(result);
-    result = result + "\n" + webPage;
-    server.send(200, "text/plain", result);
+    server.send(200, "text/html", "Current SSID set to: " + privateSsid);
     delay(1000);
   });
   server.begin();
