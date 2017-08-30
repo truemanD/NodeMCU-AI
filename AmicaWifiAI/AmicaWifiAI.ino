@@ -9,8 +9,12 @@ int status = WL_IDLE_STATUS;
 int statusAP = WL_IDLE_STATUS;
 const char ownSsid[] = "SmartHome";
 const char ownPassword[] = "SmartHomeModule";
+String privateSsid;
+String privatePassword;
+
 ESP8266WebServer server(80);
 const int pin = 13;
+String webPage = "";
 
 void setup() {
   pinMode(pin, OUTPUT);
@@ -32,7 +36,12 @@ void loop()
     if (statusAP == 0) {
       createAccessPoint();
     }
-    scanAndConnectToNetwork();
+    if (privateSsid.length() == 0) {
+      scanAndConnectToNetwork();
+    } else {
+      connectToWifi(privateSsid, privatePassword);
+      privateSsid = "";
+    }
   }
   if (status == WL_CONNECTED)  {
     if (statusAP == 1) {
@@ -42,10 +51,6 @@ void loop()
 
   blink_status();
   server.handleClient();
-}
-
-void handleRoot() {
-  server.send(200, "text/html", "<h1>You are connected</h1>");
 }
 
 void createAccessPoint() {
@@ -66,8 +71,38 @@ void disableAccessPoint() {
   Serial.print("ESP AccessPoint disabled");
 }
 
+void configureWebPage() {
+  webPage += "<h1>ESP8266 Web Server</h1><p>Bercut<a href=\"network?ssid=Bercut&amp;password=Rhbdtnrj123\"><button>Bercut</button></a>";
+  webPage += "<p>Reset<a href=\"reset\"><button>Reset</button></a>";
+}
+
 void startServer() {
-  server.on("/", handleRoot);
+  configureWebPage();
+  server.on("/", []() {
+    server.send(200, "text/html", webPage);
+    delay(1000);
+  });
+  server.on("/network", []() {
+    for (int i = 0; i <   server.args(); i++ ) {
+      Serial.print(server.argName(i) + ":" + server.arg(i));
+    }
+    privateSsid = server.arg("ssid");
+    privatePassword = server.arg("password");
+    String result = privateSsid + ":" + privatePassword;
+    Serial.println(result);
+    result = result + "\n" + webPage;
+    server.send(200, "text/plain", result);
+    delay(1000);
+  });
+  server.on("/reset", []() {
+    privateSsid = "";
+    privatePassword = "";
+    String result = privateSsid + ":" + privatePassword;
+    Serial.println(result);
+    result = result + "\n" + webPage;
+    server.send(200, "text/plain", result);
+    delay(1000);
+  });
   server.begin();
   Serial.println("HTTP server started");
 }
@@ -83,7 +118,7 @@ void scanAndConnectToNetwork() {
 
   for (int i = 0; i < n; i++)  {
     WiFi.getNetworkInfo(i, ssid, encryptionType, RSSI, BSSID, channel, isHidden);
-    Serial.printf("%d: %s, Ch:%d (%ddBm) %s %s\n", i + 1, ssid.c_str(), channel, RSSI, encryptionType == ENC_TYPE_NONE ? "open" : "", isHidden ? "hidden" : "");
+    //    Serial.printf("%d: %s, Ch:%d (%ddBm) %s %s\n", i + 1, ssid.c_str(), channel, RSSI, encryptionType == ENC_TYPE_NONE ? "open" : "", isHidden ? "hidden" : "");
 
     //connect to open Wifi;
     if (status != WL_CONNECTED)    {
@@ -136,6 +171,4 @@ void blink_status() {
     digitalWrite(pin, HIGH);
   }
 }
-
-
 
