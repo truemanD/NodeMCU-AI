@@ -14,8 +14,9 @@ String networkSsid;
 String networkUser;
 String networkPassword;
 String moduleType;
-String serverAddress;
+String dashAddress;
 String serverPoint;
+String dashToken = "token";
 boolean apUpFlag = true;
 
 ESP8266WebServer server(80);
@@ -161,7 +162,9 @@ void blink_status() {
 void http_client() {
   if (serverPoint.length() != 0) {
     HTTPClient http;
-    String message = "{\n \"auth_token\": \"token\", \n \"current\": ";
+    String message = "{\n \"auth_token\": ";
+    message = message + dashToken;
+    message = message +  ", \n \"current\": ";
     message = message + random(100);
     message = message +  ", \n \"last\": ";
     message = message + random(100);
@@ -200,8 +203,11 @@ void configureWebPage() {
              "            <p><INPUT type=\"password\" name=\"password\" value=\"";
   webPage = webPage + networkPassword;
   webPage += "\"> password<BR></p>\n"
+             "            <p><INPUT type=\"password\" name=\"token\" value=\"";
+  webPage = webPage + dashToken;
+  webPage += "\"> dashboard token<BR></p>\n"
              "            <p> <INPUT type=\"text\" name=\"server\" value=\"";
-  webPage = webPage + serverAddress;
+  webPage = webPage + dashAddress;
   webPage += "\"> server address; format: www.google.com:80 or 192.168.1.1:8080<BR></p>\n"
              "            <p>Module type: ";
   webPage = webPage + moduleType;
@@ -229,8 +235,9 @@ void startServer() {
     networkSsid = server.arg("ssid");
     networkUser = server.arg("user");
     networkPassword = server.arg("password");
+    dashToken = server.arg("token");
     moduleType = server.arg("module");
-    serverAddress = server.arg("server");
+    dashAddress = server.arg("server");
     apUpFlag = server.arg("apUpFlag") == "0" ? false : true;
 
     String result = webPage;
@@ -243,10 +250,13 @@ void startServer() {
     if (networkPassword.length() != 0) {
       result = result + "\nuser password: " + networkPassword;
     }
+    if (dashToken.length() != 0) {
+      result = result + "\nDashboard token: " + dashToken;
+    }
     if (moduleType.length() != 0) {
       if (moduleType != "ap") {
-        if (serverAddress.length() != 0) {
-          serverPoint = "http://" + serverAddress + "/widgets/" + moduleType;
+        if (dashAddress.length() != 0) {
+          serverPoint = "http://" + dashAddress + "/widgets/" + moduleType;
           result = result + "\nCurrent serverPoint set to: " + serverPoint;
         }
       }
@@ -255,8 +265,8 @@ void startServer() {
       disableAccessPoint();
       createAccessPoint();
     }
-    if (serverAddress.length() != 0) {
-      result = result + "\nServer address set to: " + serverAddress;
+    if (dashAddress.length() != 0) {
+      result = result + "\nDashboard address set to: " + dashAddress;
     }
     result = result + "\nESP AP status: " ;
     result =  result + (apUpFlag == true ? "up" : "down");
