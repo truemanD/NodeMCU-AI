@@ -8,12 +8,14 @@
 int status = WL_IDLE_STATUS;
 int statusAP = WL_IDLE_STATUS;
 String ownSsid = "SmartHome";
+String tmpOwnSsid;
 String ownPassword = "SmartHome";
-String privateSsid;
-String privateUser;
-String privatePassword;
+String networkSsid;
+String networkUser;
+String networkPassword;
 String moduleType;
 String serverAddress;
+String serverPoint;
 boolean apUpFlag = true;
 
 ESP8266WebServer server(80);
@@ -25,6 +27,7 @@ void setup() {
   Serial.begin(9600);
   Serial.println();
 
+  tmpOwnSsid = ownSsid;
   //  Serial.setDebugOutput(true);
   //  create AP
   if (apUpFlag == true) {
@@ -41,10 +44,10 @@ void loop()
 {
   status = WiFi.status();
   if (status != WL_CONNECTED)  {
-    if (privateSsid.length() == 0) {
+    if (networkSsid.length() == 0) {
       scanAndConnectToNetwork();
     } else {
-      connectToWifi(privateSsid, privatePassword);
+      connectToWifi(networkSsid, networkPassword);
     }
   }
   if (status == WL_CONNECTED)  {
@@ -63,9 +66,14 @@ void loop()
 
 void createAccessPoint() {
   Serial.print("Configuring access point for wifi network: ");
-  Serial.println(ownSsid);
+  if (moduleType.length() != 0 && moduleType != "ap") {
+    tmpOwnSsid = ownSsid + "(" + moduleType + ")" + random(1000);
+  } else {
+    tmpOwnSsid = ownSsid;
+  }
+  Serial.println(tmpOwnSsid);
   char ownSsid_char[ownSsid.length() + 1];
-  ownSsid.toCharArray(ownSsid_char, ownSsid.length() + 1);
+  tmpOwnSsid.toCharArray(ownSsid_char, tmpOwnSsid.length() + 1);
   char ownPassword_char[ownPassword.length() + 1];
   ownPassword.toCharArray(ownPassword_char, ownPassword.length() + 1);
   WiFi.softAP(ownSsid_char, ownPassword_char);
@@ -77,7 +85,7 @@ void createAccessPoint() {
 
 void disableAccessPoint() {
   Serial.print("Disabling access point: ");
-  Serial.println(ownSsid);
+  Serial.println(tmpOwnSsid);
   WiFi.softAPdisconnect(true);
   statusAP = 0;
   Serial.println("ESP AccessPoint disabled");
@@ -151,27 +159,31 @@ void blink_status() {
 }
 
 void http_client() {
-  HTTPClient http;
-  String message = "{\n \"auth_token\": \"token\", \n \"current\": ";
-  message = message + random(100);
-  message = message +  ", \nlast\": ";
-  message = message + random(100);
-  message = message +  "\n}";
-  http.begin(serverAddress);
-  http.addHeader("Accept - Encoding", "gzip, deflate");
-  http.addHeader("Content - Type", "application / json");
-  Serial.println("Server: " + serverAddress + "; Message:" + message);
-  int httpCode = http.POST(message);
-  if (httpCode > 0) {
-    Serial.printf("[HTTP] POST... code: % d\n", httpCode);
-    if (httpCode == HTTP_CODE_OK) {
-      String payload = http.getString();
-      Serial.println(payload);
+  if (serverPoint.length() != 0) {
+    HTTPClient http;
+    String message = "{\n \"auth_token\": \"token\", \n \"current\": ";
+    message = message + random(100);
+    message = message +  ", \n \"last\": ";
+    message = message + random(100);
+    message = message +  "\n}";
+    http.begin(serverPoint);
+    http.addHeader("Accept - Encoding", "gzip, deflate");
+    http.addHeader("Content - Type", "application / json");
+    Serial.println("Server: " + serverPoint + "; \nMessage: " + message);
+    int httpCode = http.POST(message);
+    if (httpCode > 0) {
+      Serial.printf("[HTTP] POST... code: % d\n", httpCode);
+      if (httpCode == HTTP_CODE_OK) {
+        String payload = http.getString();
+        Serial.println(payload);
+      }
+    } else {
+      Serial.printf("[HTTP] POST... failed, error: % s\n", http.errorToString(httpCode).c_str());
     }
+    http.end();
   } else {
-    Serial.printf("[HTTP] POST... failed, error: % s\n", http.errorToString(httpCode).c_str());
+    Serial.println("Need to set server and module type via SSID: " + tmpOwnSsid);
   }
-  http.end();
 }
 
 void configureWebPage() {
@@ -179,11 +191,21 @@ void configureWebPage() {
              "    <body>\n"
              "        <FORM name=\"module\" action=\"/\" method=\"post\">\n"
              "            Module params:<br>\n"
-             "            <p> <INPUT type=\"text\" name=\"ssid\"> ssid<BR></p>\n"
-             "            <p> <INPUT type=\"text\" name=\"user\"> user<BR></p>\n"
-             "            <p><INPUT type=\"password\" name=\"password\"> password<BR></p>\n"
-             "            <p> <INPUT type=\"text\" name=\"server\"> server address; format: www.google.com:80 or 192.168.1.1:8080<BR></p>\n"
-             "            <p>Module type</p>\n"
+             "            <p> <INPUT type=\"text\" name=\"ssid\" value=\"";
+  webPage = webPage + networkSsid;
+  webPage += "\"> ssid<BR></p>\n"
+             "            <p> <INPUT type=\"text\" name=\"user\" value=\"";
+  webPage = webPage + networkUser;
+  webPage += "\"> user<BR></p>\n"
+             "            <p><INPUT type=\"password\" name=\"password\" value=\"";
+  webPage = webPage + networkPassword;
+  webPage += "\"> password<BR></p>\n"
+             "            <p> <INPUT type=\"text\" name=\"server\" value=\"";
+  webPage = webPage + serverAddress;
+  webPage += "\"> server address; format: www.google.com:80 or 192.168.1.1:8080<BR></p>\n"
+             "            <p>Module type: ";
+  webPage = webPage + moduleType;
+  webPage += "</p>\n"
              "            <p><input type=\"radio\" name=\"module\" value=\"temperature\">temperature<Br>\n"
              "                <input type=\"radio\" name=\"module\" value=\"humidity\">humidity<Br>\n"
              "                <input type=\"radio\" name=\"module\" value=\"motion\">motion<Br>\n"
@@ -204,32 +226,32 @@ void startServer() {
     for (int i = 0; i <   server.args(); i++ ) {
       Serial.println(server.argName(i) + ":" + server.arg(i));
     }
-    privateSsid = server.arg("ssid");
-    privateUser = server.arg("user");
-    privatePassword = server.arg("password");
+    networkSsid = server.arg("ssid");
+    networkUser = server.arg("user");
+    networkPassword = server.arg("password");
     moduleType = server.arg("module");
     serverAddress = server.arg("server");
     apUpFlag = server.arg("apUpFlag") == "0" ? false : true;
 
     String result = webPage;
-    if (privateSsid.length() != 0) {
-      result = result + "\nAttempting to connect to SSID: " + privateSsid;
+    if (networkSsid.length() != 0) {
+      result = result + "\nAttempting to connect to SSID: " + networkSsid;
     }
-    if (privateUser.length() != 0) {
-      result = result + "\nuser name: " + privateUser;
+    if (networkUser.length() != 0) {
+      result = result + "\nuser name: " + networkUser;
     }
-    if (privatePassword.length() != 0) {
-      result = result + "\nuser password: " + privatePassword;
+    if (networkPassword.length() != 0) {
+      result = result + "\nuser password: " + networkPassword;
     }
     if (moduleType.length() != 0) {
       if (moduleType != "ap") {
-        serverAddress = "http://" + serverAddress + "/widgets/" + moduleType;
-        ownSsid = ownSsid + "(" + moduleType + ")" + random(1000000);
-      } else {
-        ownSsid = "SmartHome";
+        if (serverAddress.length() != 0) {
+          serverPoint = "http://" + serverAddress + "/widgets/" + moduleType;
+          result = result + "\nCurrent serverPoint set to: " + serverPoint;
+        }
       }
       result = result + "\nCurrent module set to: " + moduleType;
-      result = result + "\nReconfigure WiFi AP to: " + ownSsid + "\tPlease reconnect!";
+      result = result + "\nReconfigure WiFi AP to: " + tmpOwnSsid + "\tPlease reconnect!";
       disableAccessPoint();
       createAccessPoint();
     }
