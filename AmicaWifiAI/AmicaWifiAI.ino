@@ -152,18 +152,24 @@ void blink_status() {
 
 void http_client() {
   HTTPClient http;
-  String message = "Hello from ESP8266";
-  http.begin("https://www.google.ru/");
-  http.addHeader("Content-Type", "text/html");
+  String message = "{\n \"auth_token\": \"token\", \n \"current\": ";
+  message = message + random(100);
+  message = message +  ", \nlast\": ";
+  message = message + random(100);
+  message = message +  "\n}";
+  http.begin(serverAddress);
+  http.addHeader("Accept - Encoding", "gzip, deflate");
+  http.addHeader("Content - Type", "application / json");
+  Serial.println("Server: " + serverAddress + "; Message:" + message);
   int httpCode = http.POST(message);
   if (httpCode > 0) {
-    Serial.printf("[HTTP] POST... code: %d\n", httpCode);
+    Serial.printf("[HTTP] POST... code: % d\n", httpCode);
     if (httpCode == HTTP_CODE_OK) {
       String payload = http.getString();
       Serial.println(payload);
     }
   } else {
-    Serial.printf("[HTTP] POST... failed, error: %s\n", http.errorToString(httpCode).c_str());
+    Serial.printf("[HTTP] POST... failed, error: % s\n", http.errorToString(httpCode).c_str());
   }
   http.end();
 }
@@ -171,12 +177,12 @@ void http_client() {
 void configureWebPage() {
   webPage += "<html>\n"
              "    <body>\n"
-             "        <FORM name=\"module\" action = \"/\" method=\"post\">\n"
+             "        <FORM name=\"module\" action=\"/\" method=\"post\">\n"
              "            Module params:<br>\n"
              "            <p> <INPUT type=\"text\" name=\"ssid\"> ssid<BR></p>\n"
              "            <p> <INPUT type=\"text\" name=\"user\"> user<BR></p>\n"
              "            <p><INPUT type=\"password\" name=\"password\"> password<BR></p>\n"
-             "            <p> <INPUT type=\"text\" name=\"server\"> server address<BR></p>\n"
+             "            <p> <INPUT type=\"text\" name=\"server\"> server address; format: www.google.com:80 or 192.168.1.1:8080<BR></p>\n"
              "            <p>Module type</p>\n"
              "            <p><input type=\"radio\" name=\"module\" value=\"temperature\">temperature<Br>\n"
              "                <input type=\"radio\" name=\"module\" value=\"humidity\">humidity<Br>\n"
@@ -217,6 +223,7 @@ void startServer() {
     }
     if (moduleType.length() != 0) {
       if (moduleType != "ap") {
+        serverAddress = "http://" + serverAddress + "/widgets/" + moduleType;
         ownSsid = ownSsid + "(" + moduleType + ")" + random(1000000);
       } else {
         ownSsid = "SmartHome";
