@@ -1,0 +1,11 @@
+$background-color: #008000; /*default color*/
+
+$title-color: rgba(255, 255, 255, 1);
+$moreinfo-color: rgba(255, 255, 255, 0.7);
+
+
+.widget-state {
+    background: $background-color;
+    font-size: 65px;
+    font-weight: bold;   
+}

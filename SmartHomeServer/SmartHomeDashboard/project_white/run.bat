@@ -1,0 +1,1 @@
+smashing start -p 8080 >> log.txt

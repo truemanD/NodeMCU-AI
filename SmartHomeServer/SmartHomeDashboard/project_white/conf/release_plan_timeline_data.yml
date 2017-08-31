@@ -1,0 +1,52 @@
+# COLOR GUIDE
+# holiday = lightgreen
+# deadline = red
+# release = yellow
+# misc = white
+
+events:
+  - name: "InVoice 4.7.33.0"
+    date: "2017-01-23"
+    background: "lightgreen"
+    problem: "Запуск состоялся не в срок 1"
+  - name: "InVoice 4.7.34.0"
+    date: "2017-03-03"
+    background: "lightgreen"
+    problem: "При запуске возникли критические ошибки. Причина возникновения - эксплуатация."
+  - name: "InVoice 4.7.35.0"
+    date: "2017-05-02"
+    background: "lightgreen"
+    problem: "Потребовалась доработка функционала в рамках ОИ 4.7.35.1"
+  - name: "ОИ 4.7.35.1"
+    date: "2017-05-20"
+    background: "lightgreen"
+    problem: "Исравление функционала Sharing"
+  - name: "InVoice 4.7.36.0"
+    date: "2017-07-03"
+    background: "yellow"
+    problem: 
+  - name: "InVoice 4.7.37.0"
+    date: "2017-08-28"
+    background: "yellow"
+    problem: 
+  - name: "InVoice 4.7.38.0"
+    date: "2017-10-23"
+    background: "red"
+    problem: "To Tele2::08.02.2017 - выложены новые требования\n
+    To Tele2::16.02.2017 - необходимо согласовать ОФТ.\n
+    To Tele2:: Согласовать ЭО(от 15.01) и ОФТ (от 18.02)\n
+    To Tele2:: ОФТ выложно 31.01. ждем согласования\n
+    Tо Bercut:: отработать ОС по ОФТ\n
+    To Tele2:: согласовать кейсы и ОФТ\n
+    To Tele2:: ждем требований до 14.02. Есть запрос в системе TFS. \n
+    Запрос будет ориентировочно 24.01. \n
+    Вероятно есть workarround, уточним 16.01.\n
+    уточним 20.01"
+  - name: "InVoice 4.7.39.0"
+    date: "2017-12-25"
+    background: "red"
+    problem: "212914 в рамках запроса прорабатывается миграция\n
+    28.02.2017 13.03.2017- выбрать вариант, выложили 07.03. \n
+    до 15.03.2017 - закончить детальный анализ"
+
+

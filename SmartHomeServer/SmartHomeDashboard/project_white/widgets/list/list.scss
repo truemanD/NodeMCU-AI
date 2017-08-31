@@ -1,0 +1,75 @@
+// ----------------------------------------------------------------------------
+// Sass declarations
+// ----------------------------------------------------------------------------
+$background-color:  #12b0c5;
+$value-color:       #ffffff;
+
+$title-color:       #ffffff;
+$label-color:       #ffffff;
+$moreinfo-color:    #ffffff;
+
+// ----------------------------------------------------------------------------
+// Widget-list styles
+// ----------------------------------------------------------------------------
+.widget-list {
+
+    background-color: $background-color;
+    vertical-align: inherit;
+
+    .title {
+        color: $title-color;
+    }
+
+    ol, ul {
+        overflow:hidden;
+        /*float:left;*/
+        margin: 0 15px;
+        text-align: left;
+        color: $label-color;
+    }
+    /*
+        ol {
+            list-style-position: inside;
+        }*/
+
+    li {
+        /*float:left;*/
+        /*display: inline-block;*/
+        margin-bottom: 5px;
+    }
+
+    .list-nostyle {
+        list-style: none;
+    }
+
+    .label {
+        float: left;
+        color: $label-color;
+    }
+
+    .value {
+        float: contour;
+        /*margin-left: 12px;*/
+        font-weight: 600;
+        color: $value-color;
+    }
+
+    .updated-at {
+        color: #ffffff;
+        font-size: 15px;
+        position: static;
+        /*top: 2px;*/
+        bottom: 12px;
+        left: 0;
+        right: 0;
+        color: #ffffff;
+    }
+
+    .more-info {
+        color: $moreinfo-color;
+    }
+    .clearlist {
+        clear:both;
+        margin:0 410px 0 34px;  
+    }
+}

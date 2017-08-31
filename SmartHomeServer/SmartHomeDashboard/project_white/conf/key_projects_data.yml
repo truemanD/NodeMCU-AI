@@ -1,0 +1,35 @@
+# COLOR GUIDE
+# holiday = lightgreen
+# deadline = red
+# release = yellow
+# misc = white
+
+events:
+  - name: "Welcome SMS"
+    status: "lightgreen"
+    progress: 100
+    problem: "Все чики-пуки"
+  - name: "CEM"
+    status: "lightgreen"
+    progress: 20
+    problem: "Описание проблемы"
+  - name: "Notification System"
+    status: "lightgreen"
+    progress: 10
+    problem: "Описание проблемы"
+  - name: "Geo шина"
+    status: "lightgreen"
+    progress: 0
+    problem: "Описание проблемы"
+  - name: "IVR 0"
+    status: "lightgreen"
+    progress: 100
+    problem: "Все чики-пуки"
+  - name: "PL v3"
+    status: "lightgreen"
+    progress: 50
+    problem: "Описание проблемы"
+  - name: "Cloudera Tele2"
+    status: "yellow"
+    progress: 20
+    problem: "Описание проблемы"

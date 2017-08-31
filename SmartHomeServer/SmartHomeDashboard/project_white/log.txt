@@ -1,0 +1,26 @@
+Thin web server (v1.6.4 codename Gob Bluth)
+Maximum connections set to 1024
+Listening on 0.0.0.0:80, CTRL+C to stop
+Thin web server (v1.6.4 codename Gob Bluth)
+Maximum connections set to 1024
+Listening on 0.0.0.0:80, CTRL+C to stop
+Thin web server (v1.6.4 codename Gob Bluth)
+Maximum connections set to 1024
+Listening on 0.0.0.0:80, CTRL+C to stop
+Завершить выполнение пакетного файла [Y(да)/N(нет)]? Thin web server (v1.6.4 codename Gob Bluth)
+Maximum connections set to 1024
+Listening on 0.0.0.0:8080, CTRL+C to stop
+Stopping ...
+Завершить выполнение пакетного файла [Y(да)/N(нет)]? 
+
+Завершить выполнение пакетного файла [Y(да)/N(нет)]? Завершить выполнение пакетного файла [Y(да)/N(нет)]? Завершить выполнение пакетного файла [Y(да)/N(нет)]? Завершить выполнение пакетного файла [Y(да)/N(нет)]? Завершить выполнение пакетного файла [Y(да)/N(нет)]? 
+Завершить выполнение пакетного файла [Y(да)/N(нет)]? Thin web server (v1.6.4 codename Gob Bluth)
+Maximum connections set to 1024
+Listening on 0.0.0.0:8080, CTRL+C to stop
+Stopping ...
+Завершить выполнение пакетного файла [Y(да)/N(нет)]? Завершить выполнение пакетного файла [Y(да)/N(нет)]? Завершить выполнение пакетного файла [Y(да)/N(нет)]? Завершить выполнение пакетного файла [Y(да)/N(нет)]? Завершить выполнение пакетного файла [Y(да)/N(нет)]? Завершить выполнение пакетного файла [Y(да)/N(нет)]? 
+Завершить выполнение пакетного файла [Y(да)/N(нет)]? Thin web server (v1.6.4 codename Gob Bluth)
+Maximum connections set to 1024
+Listening on 0.0.0.0:8080, CTRL+C to stop
+Stopping ...
+Завершить выполнение пакетного файла [Y(да)/N(нет)]? Завершить выполнение пакетного файла [Y(да)/N(нет)]? Завершить выполнение пакетного файла [Y(да)/N(нет)]? Завершить выполнение пакетного файла [Y(да)/N(нет)]? 
