@@ -162,9 +162,9 @@ void blink_status() {
 void http_client() {
   if (serverPoint.length() != 0) {
     HTTPClient http;
-    String message = "{\n \"auth_token\": ";
+    String message = "{\n \"auth_token\": \"";
     message = message + dashToken;
-    message = message +  ", \n \"current\": ";
+    message = message +  "\", \n \"current\": ";
     message = message + random(100);
     message = message +  ", \n \"last\": ";
     message = message + random(100);
