@@ -1,1 +1,1 @@
-smashing start -p 8080 >> log.txt
+smashing start -p 5000 >> log.txt

@@ -1,3 +1,14 @@
+#include <Adafruit_Sensor.h>
+#include <DHT.h>
+#include <DHT_U.h>
+
+#define DHTPIN            2         // Pin which is connected to the DHT sensor.
+
+#define DHTTYPE           DHT11     // DHT 11 
+
+DHT_Unified dht(DHTPIN, DHTTYPE);
+
+uint32_t delayMS;
 
 #include <Arduino.h>
 
@@ -10,11 +21,11 @@ int statusAP = WL_IDLE_STATUS;
 String ownSsid = "SmartHome";
 String tmpOwnSsid;
 String ownPassword = "SmartHome";
-String networkSsid;
+String networkSsid = "HOME";
 String networkUser;
-String networkPassword;
-String moduleType;
-String dashAddress;
+String networkPassword = "ARjOwI23";
+String moduleType = "temperature";
+String dashAddress = "192.168.1.125:5000";
 String serverPoint;
 String dashToken = "token";
 boolean apUpFlag = true;
@@ -39,6 +50,12 @@ void setup() {
 
   //configureWebPage
   configureWebPage();
+  dht.begin();
+  sensor_t sensor;
+  dht.temperature().getSensor(&sensor);
+  dht.humidity().getSensor(&sensor);
+  delayMS = sensor.min_delay / 1000;
+
 }
 
 void loop()
@@ -52,7 +69,7 @@ void loop()
     }
   }
   if (status == WL_CONNECTED)  {
-    http_client();
+    sensors();
   }
   if (statusAP == 0 && apUpFlag == true) {
     createAccessPoint();
@@ -68,7 +85,8 @@ void loop()
 void createAccessPoint() {
   Serial.print("Configuring access point for wifi network: ");
   if (moduleType.length() != 0 && moduleType != "ap") {
-    tmpOwnSsid = ownSsid + "(" + moduleType + ")" + random(1000);
+    tmpOwnSsid = ownSsid + "(" + moduleType + ")";
+    //    tmpOwnSsid = ownSsid + "(" + moduleType + ")" + random(1000);
   } else {
     tmpOwnSsid = ownSsid;
   }
@@ -159,20 +177,61 @@ void blink_status() {
   }
 }
 
-void http_client() {
+void sensors() {
+  delay(delayMS);
+  // Get temperature event and print its value.
+  sensors_event_t event;
+  dht.temperature().getEvent(&event);
+  if (isnan(event.temperature)) {
+    Serial.println("Error reading temperature!");
+  }
+  else {
+    Serial.print("Temperature: ");
+    Serial.print(event.temperature);
+    Serial.println(" *C");
+    http_client(event.temperature, 0);
+  }
+  // Get humidity event and print its value.
+  dht.humidity().getEvent(&event);
+  if (isnan(event.relative_humidity)) {
+    Serial.println("Error reading humidity!");
+  }
+  else {
+    Serial.print("Humidity: ");
+    Serial.print(event.relative_humidity);
+    Serial.println("%");
+    http_client(event.relative_humidity, 1);
+  }
+}
+
+void http_client(float value, int type) {
+  if (moduleType.length() != 0) {
+    if (moduleType != "ap") {
+      if (dashAddress.length() != 0) {
+        //        serverPoint = "http://" + dashAddress + "/widgets/" + moduleType;
+        serverPoint = "http://" + dashAddress + "/widgets/";
+      }
+    }
+  }
+  String tmpServerPoint;
   if (serverPoint.length() != 0) {
-    HTTPClient http;
+    if (type == 0) {
+      tmpServerPoint = serverPoint + "temperature";
+    }
+    if (type == 1) {
+      tmpServerPoint = serverPoint + "humidity";
+    }
     String message = "{\n \"auth_token\": \"";
     message = message + dashToken;
     message = message +  "\", \n \"current\": ";
-    message = message + random(100);
-    message = message +  ", \n \"last\": ";
-    message = message + random(100);
+    message = message + value;
     message = message +  "\n}";
-    http.begin(serverPoint);
-    http.addHeader("Accept - Encoding", "gzip, deflate");
-    http.addHeader("Content - Type", "application / json");
-    Serial.println("Server: " + serverPoint + "; \nMessage: " + message);
+    Serial.println("Server:\n" + tmpServerPoint + "; \nMessage:\n" + message);
+
+    HTTPClient http;
+    http.begin(tmpServerPoint);
+    http.addHeader("Accept-Encoding", "gzip, deflate");
+    http.addHeader("Content-Type", "application/json");
     int httpCode = http.POST(message);
     if (httpCode > 0) {
       Serial.printf("[HTTP] POST... code: % d\n", httpCode);
@@ -183,6 +242,7 @@ void http_client() {
     } else {
       Serial.printf("[HTTP] POST... failed, error: % s\n", http.errorToString(httpCode).c_str());
     }
+    delay(1000);
     http.end();
   } else {
     Serial.println("Need to set server and module type via SSID: " + tmpOwnSsid);
@@ -232,12 +292,12 @@ void startServer() {
     for (int i = 0; i <   server.args(); i++ ) {
       Serial.println(server.argName(i) + ":" + server.arg(i));
     }
-    networkSsid = server.arg("ssid");
-    networkUser = server.arg("user");
-    networkPassword = server.arg("password");
-    dashToken = server.arg("token");
-    moduleType = server.arg("module");
-    dashAddress = server.arg("server");
+    networkSsid = server.arg("ssid").length() > 0 ? server.arg("ssid") : networkSsid;
+    networkUser = server.arg("user").length() > 0 ? server.arg("user") : networkUser;
+    networkPassword = server.arg("password").length() > 0 ? server.arg("password") : networkPassword;
+    dashToken = server.arg("token").length() > 0 ? server.arg("token") : dashToken;
+    moduleType = server.arg("module").length() > 0 ? server.arg("module") : moduleType;
+    dashAddress = server.arg("server").length() > 0 ? server.arg("server") : dashAddress;
     apUpFlag = server.arg("apUpFlag") == "0" ? false : true;
 
     String result = webPage;
@@ -270,6 +330,7 @@ void startServer() {
     }
     result = result + "\nESP AP status: " ;
     result =  result + (apUpFlag == true ? "up" : "down");
+    //    Serial.println(result);
     server.send(200, "text/html", result);
     delay(1000);
   });
