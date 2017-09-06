@@ -319,7 +319,7 @@ void http_client(float value, int type) {
       message = message + "humidity";
     }
 
-    message = message +  ":\"";
+    message = message +  "\":";
     message = message + value;
     message = message +  "\n}";
     Serial.println("Server:\n" + serverPoint + "; \nMessage:\n" + message);
