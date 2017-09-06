@@ -21,18 +21,26 @@ int statusAP = WL_IDLE_STATUS;
 String ownSsid = "SmartHome";
 String tmpOwnSsid;
 String ownPassword = "SmartHome";
-String networkSsid = "HOME";
+String networkSsid;
 String networkUser;
-String networkPassword = "ARjOwI23";
-String moduleType = "temperature";
-String dashAddress = "192.168.1.125:5000";
+String networkPassword ;
+String moduleType = "ap";
+String dashAddress;
 String serverPoint;
-String dashToken = "token";
+String dashToken;
 boolean apUpFlag = true;
 
 ESP8266WebServer server(80);
 const int pin = 13;
 String webPage = "";
+
+void initDefNetwork() {
+  networkSsid = "HOME";
+  networkPassword = "ARjOwI23";
+  moduleType = "tempHumid";
+  dashAddress = "192.168.1.125:5000";
+  dashToken = "token";
+}
 
 void setup() {
   pinMode(pin, OUTPUT);
@@ -40,16 +48,16 @@ void setup() {
   Serial.println();
 
   tmpOwnSsid = ownSsid;
-  //  Serial.setDebugOutput(true);
+  Serial.setDebugOutput(true);
+
+  //configureWebPage
+  configureWebPage();
+
   //  create AP
   if (apUpFlag == true) {
     createAccessPoint();
   }
-  //scan networks
-  scanAndConnectToNetwork();
 
-  //configureWebPage
-  configureWebPage();
   dht.begin();
   sensor_t sensor;
   dht.temperature().getSensor(&sensor);
@@ -69,16 +77,16 @@ void loop()
     }
   }
   if (status == WL_CONNECTED)  {
-    sensors();
+    initSensors();
   }
+
+
   if (statusAP == 0 && apUpFlag == true) {
     createAccessPoint();
   }
   if (statusAP == 1 && apUpFlag == false) {
     disableAccessPoint();
   }
-
-  blink_status();
   server.handleClient();
 }
 
@@ -133,6 +141,103 @@ void scanAndConnectToNetwork() {
   WiFi.scanDelete();
 }
 
+void configureWebPage() {
+  webPage = "<html>\n"
+            "    <body>\n"
+            "        <FORM name=\"module\" action=\"/\" method=\"post\">\n"
+            "            Network params:<br>\n"
+            "            <p> <INPUT type=\"text\" name=\"ssid\" value=\"";
+  webPage = webPage + networkSsid;
+  webPage += "\"> ssid<BR></p>\n"
+             "            <p> <INPUT type=\"text\" name=\"user\" value=\"";
+  webPage = webPage + networkUser;
+  webPage += "\"> user<BR></p>\n"
+             "            <p><INPUT type=\"password\" name=\"password\" value=\"";
+  webPage = webPage + networkPassword;
+  webPage += "\"> password<BR></p>\n"
+             "            Module params:<br>\n<p>Module type: ";
+  webPage = webPage + moduleType;
+  webPage += "</p>\n"
+             "            <p><input type=\"radio\" name=\"module\" value=\"tempHumid\">tempHumid<Br>\n"
+             "                <input type=\"radio\" name=\"module\" value=\"motion\">motion<Br>\n"
+             "                <input type=\"radio\" name=\"module\" value=\"ap\">access point</p>\n"
+             "            <p> <INPUT type=\"text\" name=\"server\" value=\"";
+  webPage = webPage + dashAddress;
+  webPage += "\"> server address; format: www.google.com:80 or 192.168.1.1:8080<BR></p>\n"
+             "            <p><INPUT type=\"password\" name=\"token\" value=\"";
+  webPage = webPage + dashToken;
+  webPage += "\"> dashboard token<BR></p>\n"
+             "            <p>Module AP status: " ;
+  webPage = webPage +  (apUpFlag == true ? "up" : "down") ;
+  webPage += "</p>\n"
+             "                <input type=\"radio\" name=\"apUpFlag\" value=\"0\">down<Br>\n"
+             "            <p><INPUT type =\"submit\" value=\"update\"></p>\n"
+             "        </FORM>\n"
+             "    </body>\n"
+             "</html>";
+}
+
+void startServer() {
+  server.on("/", []() {
+    Serial.println("Get request params");
+    for (int i = 0; i <   server.args(); i++ ) {
+      Serial.println(server.argName(i) + ":" + server.arg(i));
+    }
+    String tmpNetworkSsid = server.arg("ssid").length() > 0 ? server.arg("ssid") : networkSsid;
+    String tmpNetworkUser = server.arg("user").length() > 0 ? server.arg("user") : networkUser;
+    String tmpNetworkPassword = server.arg("password").length() > 0 ? server.arg("password") : networkPassword;
+    String tmpDashToken = server.arg("token").length() > 0 ? server.arg("token") : dashToken;
+    String tmpModuleType = server.arg("module").length() > 0 ? server.arg("module") : moduleType;
+    String tmpDashAddress = server.arg("server").length() > 0 ? server.arg("server") : dashAddress;
+    apUpFlag = server.arg("apUpFlag") == "0" ? false : true;
+
+    if (tmpNetworkSsid.length() != 0) {
+      networkSsid = tmpNetworkSsid;
+    }
+    if (tmpNetworkUser.length() != 0) {
+      networkUser = tmpNetworkUser;
+    }
+    if (tmpNetworkPassword.length() != 0) {
+      networkPassword = tmpNetworkPassword;
+    }
+    if (tmpDashToken.length() != 0) {
+      dashToken = tmpDashToken;
+    }
+    if (tmpModuleType.length() != 0) {
+      if (tmpModuleType != moduleType) {
+        moduleType = tmpModuleType;
+        disableAccessPoint();
+        createAccessPoint();
+      }
+      if (moduleType != "ap") {
+        if (tmpDashAddress.length() != 0) {
+          dashAddress = tmpDashAddress;
+          serverPoint = "http://" + dashAddress + "/widgets/";
+        }
+      }
+    }
+    if (tmpDashAddress.length() != 0) {
+      dashAddress = tmpDashAddress;
+    }
+    configureWebPage();
+    String result = webPage;
+    result = result + "<p>ESP AP status: " ;
+    result = result + (apUpFlag == true ? "up" : "down") + "</p>";
+    result = result + "<p>Attempting to connect to SSID: " + networkSsid + "</p>";
+    result = result + "<p>User name: " + networkUser + "</p>";
+    result = result + "<p>User password: " + networkPassword + "</p>";
+    result = result + "<p>Dashboard token: " + dashToken + "</p>";
+    result = result + "<p>Current module set to: " + moduleType + "</p>";
+    result = result + "<p>Reconfigure WiFi AP to: " + tmpOwnSsid + "</p>";
+    result = result + "<p>Current serverPoint set to: " + serverPoint + "</p>";
+    result = result + "<p>Dashboard address set to: " + dashAddress + "</p>";
+    server.send(200, "text/html", result);
+    delay(1000);
+  });
+  server.begin();
+  Serial.println("HTTP server started");
+}
+
 void connectToWifi(String ssid,  String password) {
   char ssid_char[ssid.length() + 1];
   ssid.toCharArray(ssid_char, ssid.length() + 1);
@@ -158,7 +263,7 @@ void connectToWifi(String ssid,  String password) {
     counter++;
   }
   if (status == WL_CONNECTED) {
-    server.send(200, "text/html", webPage + "NodeMCU NOT connected to the network");
+    server.send(200, "text/html", webPage + "NodeMCU connected to the network");
     Serial.println("NodeMCU connected to the network");
   } else {
     server.send(200, "text/html", webPage + "NodeMCU NOT connected to the network");
@@ -166,18 +271,7 @@ void connectToWifi(String ssid,  String password) {
   }
 }
 
-void blink_status() {
-  if (status != WL_CONNECTED) {
-    digitalWrite(pin, LOW);
-    delay(100);
-    digitalWrite(pin, HIGH);
-    delay(100);
-  } else {
-    digitalWrite(pin, HIGH);
-  }
-}
-
-void sensors() {
+void initSensors() {
   delay(delayMS);
   // Get temperature event and print its value.
   sensors_event_t event;
@@ -248,93 +342,3 @@ void http_client(float value, int type) {
     Serial.println("Need to set server and module type via SSID: " + tmpOwnSsid);
   }
 }
-
-void configureWebPage() {
-  webPage += "<html>\n"
-             "    <body>\n"
-             "        <FORM name=\"module\" action=\"/\" method=\"post\">\n"
-             "            Module params:<br>\n"
-             "            <p> <INPUT type=\"text\" name=\"ssid\" value=\"";
-  webPage = webPage + networkSsid;
-  webPage += "\"> ssid<BR></p>\n"
-             "            <p> <INPUT type=\"text\" name=\"user\" value=\"";
-  webPage = webPage + networkUser;
-  webPage += "\"> user<BR></p>\n"
-             "            <p><INPUT type=\"password\" name=\"password\" value=\"";
-  webPage = webPage + networkPassword;
-  webPage += "\"> password<BR></p>\n"
-             "            <p><INPUT type=\"password\" name=\"token\" value=\"";
-  webPage = webPage + dashToken;
-  webPage += "\"> dashboard token<BR></p>\n"
-             "            <p> <INPUT type=\"text\" name=\"server\" value=\"";
-  webPage = webPage + dashAddress;
-  webPage += "\"> server address; format: www.google.com:80 or 192.168.1.1:8080<BR></p>\n"
-             "            <p>Module type: ";
-  webPage = webPage + moduleType;
-  webPage += "</p>\n"
-             "            <p><input type=\"radio\" name=\"module\" value=\"temperature\">temperature<Br>\n"
-             "                <input type=\"radio\" name=\"module\" value=\"humidity\">humidity<Br>\n"
-             "                <input type=\"radio\" name=\"module\" value=\"motion\">motion<Br>\n"
-             "                <input type=\"radio\" name=\"module\" value=\"ap\">access point</p>\n"
-             "            <p>Module AP status: " ;
-  webPage = webPage +  (apUpFlag == true ? "up" : "down") ;
-  webPage += "</p>\n"
-             "                <input type=\"radio\" name=\"apUpFlag\" value=\"0\">down<Br>\n"
-             "            <p><INPUT type =\"submit\" value=\"update\"></p>\n"
-             "        </FORM>\n"
-             "    </body>\n"
-             "</html>";
-}
-
-void startServer() {
-  server.on("/", []() {
-    Serial.println("Get request params");
-    for (int i = 0; i <   server.args(); i++ ) {
-      Serial.println(server.argName(i) + ":" + server.arg(i));
-    }
-    networkSsid = server.arg("ssid").length() > 0 ? server.arg("ssid") : networkSsid;
-    networkUser = server.arg("user").length() > 0 ? server.arg("user") : networkUser;
-    networkPassword = server.arg("password").length() > 0 ? server.arg("password") : networkPassword;
-    dashToken = server.arg("token").length() > 0 ? server.arg("token") : dashToken;
-    moduleType = server.arg("module").length() > 0 ? server.arg("module") : moduleType;
-    dashAddress = server.arg("server").length() > 0 ? server.arg("server") : dashAddress;
-    apUpFlag = server.arg("apUpFlag") == "0" ? false : true;
-
-    String result = webPage;
-    if (networkSsid.length() != 0) {
-      result = result + "\nAttempting to connect to SSID: " + networkSsid;
-    }
-    if (networkUser.length() != 0) {
-      result = result + "\nuser name: " + networkUser;
-    }
-    if (networkPassword.length() != 0) {
-      result = result + "\nuser password: " + networkPassword;
-    }
-    if (dashToken.length() != 0) {
-      result = result + "\nDashboard token: " + dashToken;
-    }
-    if (moduleType.length() != 0) {
-      if (moduleType != "ap") {
-        if (dashAddress.length() != 0) {
-          serverPoint = "http://" + dashAddress + "/widgets/" + moduleType;
-          result = result + "\nCurrent serverPoint set to: " + serverPoint;
-        }
-      }
-      result = result + "\nCurrent module set to: " + moduleType;
-      result = result + "\nReconfigure WiFi AP to: " + tmpOwnSsid + "\tPlease reconnect!";
-      disableAccessPoint();
-      createAccessPoint();
-    }
-    if (dashAddress.length() != 0) {
-      result = result + "\nDashboard address set to: " + dashAddress;
-    }
-    result = result + "\nESP AP status: " ;
-    result =  result + (apUpFlag == true ? "up" : "down");
-    //    Serial.println(result);
-    server.send(200, "text/html", result);
-    delay(1000);
-  });
-  server.begin();
-  Serial.println("HTTP server started");
-}
-
