@@ -16,6 +16,7 @@ uint32_t delayMS;
 #include <ESP8266WebServer.h>
 #include <ESP8266HTTPClient.h>
 
+ADC_MODE(ADC_VCC); //vcc read
 int status = WL_IDLE_STATUS;
 int statusAP = WL_IDLE_STATUS;
 String ownSsid = "SmartHome";
@@ -31,7 +32,8 @@ String dashToken;
 boolean apUpFlag = true;
 
 ESP8266WebServer server(80);
-const int pin = 13;
+const int tempPin = 4;
+const int humPin = 5;
 String webPage = "";
 
 void initDefNetwork() {
@@ -43,7 +45,8 @@ void initDefNetwork() {
 }
 
 void setup() {
-  pinMode(pin, OUTPUT);
+  pinMode(tempPin, OUTPUT);
+  pinMode(humPin, OUTPUT);
   Serial.begin(9600);
   Serial.println();
 
@@ -76,6 +79,7 @@ void loop()
       scanAndConnectToNetwork();
     } else {
       connectToWifi(networkSsid, networkPassword);
+      http_client(tmpOwnSsid, "ssid");
     }
   }
   if (status == WL_CONNECTED)  {
@@ -286,7 +290,11 @@ void initSensors() {
     Serial.print("Temperature: ");
     Serial.print(event.temperature);
     Serial.println(" *C");
-    http_client(event.temperature, 0);
+    http_client(event.temperature, "temperature");
+    //    digitalWrite(tempPin, HIGH);   // turn the LED on (HIGH is the voltage level)
+    //    delay(1000);                       // wait for a second
+    //    digitalWrite(tempPin, LOW);    // turn the LED off by making the voltage LOW
+    //    delay(1000);                       // wait for a second
   }
   // Get humidity event and print its value.
   dht.humidity().getEvent(&event);
@@ -297,11 +305,28 @@ void initSensors() {
     Serial.print("Humidity: ");
     Serial.print(event.relative_humidity);
     Serial.println("%");
-    http_client(event.relative_humidity, 1);
+    http_client(event.relative_humidity, "humidity");
+    //    digitalWrite(humPin, HIGH);   // turn the LED on (HIGH is the voltage level)
+    //    delay(1000);                       // wait for a second
+    //    digitalWrite(humPin, LOW);    // turn the LED off by making the voltage LOW
+    //    delay(1000);                       // wait for a second
+  }
+  //  Get voltage
+  {
+    float vdd = ESP.getVcc();
+    vdd = vdd / 1000;
+    Serial.print("Voltage: ");
+    Serial.print(vdd);
+    Serial.println("V");
+    http_client(vdd, "voltage");
   }
 }
 
-void http_client(float value, int type) {
+void http_client(float value, String type) {
+  http_client(String(value), type);
+}
+
+void postMessage(String value, String type) {
   if (moduleType != "ap") {
     if (dashAddress.length() != 0) {
       serverPoint = "http://" + dashAddress + "/api/v1/";
@@ -312,13 +337,7 @@ void http_client(float value, int type) {
   }
   if (serverPoint.length() != 0) {
     String message = "{\n \"";
-    if (type == 0) {
-      message = message + "temperature";
-    }
-    if (type == 1) {
-      message = message + "humidity";
-    }
-
+    message = message + type;
     message = message +  "\":";
     message = message + value;
     message = message +  "\n}";
