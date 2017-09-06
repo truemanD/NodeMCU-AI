@@ -79,7 +79,7 @@ void loop()
       scanAndConnectToNetwork();
     } else {
       connectToWifi(networkSsid, networkPassword);
-      http_client(tmpOwnSsid, "ssid");
+      postMessage(tmpOwnSsid, "ssid");
     }
   }
   if (status == WL_CONNECTED)  {
@@ -290,7 +290,7 @@ void initSensors() {
     Serial.print("Temperature: ");
     Serial.print(event.temperature);
     Serial.println(" *C");
-    http_client(event.temperature, "temperature");
+    postMessage(event.temperature, "temperature");
     //    digitalWrite(tempPin, HIGH);   // turn the LED on (HIGH is the voltage level)
     //    delay(1000);                       // wait for a second
     //    digitalWrite(tempPin, LOW);    // turn the LED off by making the voltage LOW
@@ -305,7 +305,7 @@ void initSensors() {
     Serial.print("Humidity: ");
     Serial.print(event.relative_humidity);
     Serial.println("%");
-    http_client(event.relative_humidity, "humidity");
+    postMessage(event.relative_humidity, "humidity");
     //    digitalWrite(humPin, HIGH);   // turn the LED on (HIGH is the voltage level)
     //    delay(1000);                       // wait for a second
     //    digitalWrite(humPin, LOW);    // turn the LED off by making the voltage LOW
@@ -318,12 +318,12 @@ void initSensors() {
     Serial.print("Voltage: ");
     Serial.print(vdd);
     Serial.println("V");
-    http_client(vdd, "voltage");
+    postMessage(vdd, "voltage");
   }
 }
 
-void http_client(float value, String type) {
-  http_client(String(value), type);
+void postMessage(float value, String type) {
+  postMessage(String(value), type);
 }
 
 void postMessage(String value, String type) {
