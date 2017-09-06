@@ -38,14 +38,16 @@ void initDefNetwork() {
   networkSsid = "HOME";
   networkPassword = "ARjOwI23";
   moduleType = "tempHumid";
-  dashAddress = "192.168.1.125:5000";
-  dashToken = "token";
+  dashAddress = "demo.thingsboard.io";
+  dashToken = "DGAHvEw5X9ZI6rYx8KMr";
 }
 
 void setup() {
   pinMode(pin, OUTPUT);
   Serial.begin(9600);
   Serial.println();
+
+  initDefNetwork();
 
   tmpOwnSsid = ownSsid;
   Serial.setDebugOutput(true);
@@ -200,9 +202,6 @@ void startServer() {
     if (tmpNetworkPassword.length() != 0) {
       networkPassword = tmpNetworkPassword;
     }
-    if (tmpDashToken.length() != 0) {
-      dashToken = tmpDashToken;
-    }
     if (tmpModuleType.length() != 0) {
       if (tmpModuleType != moduleType) {
         moduleType = tmpModuleType;
@@ -212,9 +211,13 @@ void startServer() {
       if (moduleType != "ap") {
         if (tmpDashAddress.length() != 0) {
           dashAddress = tmpDashAddress;
-          serverPoint = "http://" + dashAddress + "/widgets/";
+          //          serverPoint = "http://" + dashAddress + "/api/v1/";
         }
       }
+    }
+    if (tmpDashToken.length() != 0) {
+      dashToken = tmpDashToken;
+      //      serverPoint = serverPoint + "/telemetry";
     }
     if (tmpDashAddress.length() != 0) {
       dashAddress = tmpDashAddress;
@@ -299,32 +302,31 @@ void initSensors() {
 }
 
 void http_client(float value, int type) {
-  if (moduleType.length() != 0) {
-    if (moduleType != "ap") {
-      if (dashAddress.length() != 0) {
-        //        serverPoint = "http://" + dashAddress + "/widgets/" + moduleType;
-        serverPoint = "http://" + dashAddress + "/widgets/";
-      }
+  if (moduleType != "ap") {
+    if (dashAddress.length() != 0) {
+      serverPoint = "http://" + dashAddress + "/api/v1/";
     }
   }
-  String tmpServerPoint;
+  if (dashToken.length() != 0) {
+    serverPoint = serverPoint + dashToken + "/telemetry";
+  }
   if (serverPoint.length() != 0) {
+    String message = "{\n \"";
     if (type == 0) {
-      tmpServerPoint = serverPoint + "temperature";
+      message = message + "temperature";
     }
     if (type == 1) {
-      tmpServerPoint = serverPoint + "humidity";
+      message = message + "humidity";
     }
-    String message = "{\n \"auth_token\": \"";
-    message = message + dashToken;
-    message = message +  "\", \n \"current\": ";
+
+    message = message +  ":\"";
     message = message + value;
     message = message +  "\n}";
-    Serial.println("Server:\n" + tmpServerPoint + "; \nMessage:\n" + message);
+    Serial.println("Server:\n" + serverPoint + "; \nMessage:\n" + message);
 
     HTTPClient http;
-    http.begin(tmpServerPoint);
-    http.addHeader("Accept-Encoding", "gzip, deflate");
+    http.begin(serverPoint);
+    //    http.addHeader("Accept-Encoding", "gzip, deflate");
     http.addHeader("Content-Type", "application/json");
     int httpCode = http.POST(message);
     if (httpCode > 0) {
