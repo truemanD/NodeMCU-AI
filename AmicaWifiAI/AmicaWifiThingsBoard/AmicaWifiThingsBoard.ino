@@ -22,14 +22,17 @@ int statusAP = WL_IDLE_STATUS;
 String ownSsid = "SmartHome";
 String tmpOwnSsid;
 String ownPassword = "SmartHome";
+String ownIP;
 String networkSsid;
 String networkUser;
 String networkPassword ;
+String networkIP ;
 String moduleType = "ap";
 String dashAddress;
-String serverPoint;
-String dashToken;
+String dashToken = "SmartHome";
+//String suffix;
 boolean apUpFlag = true;
+int netExceptionCounter = 0;
 
 ESP8266WebServer server(80);
 const int tempPin = 4;
@@ -37,11 +40,34 @@ const int humPin = 5;
 String webPage = "";
 
 void initDefNetwork() {
-  networkSsid = "HOME";
-  networkPassword = "ARjOwI23";
-  moduleType = "tempHumid";
-  dashAddress = "demo.thingsboard.io";
-  dashToken = "DGAHvEw5X9ZI6rYx8KMr";
+  networkSsid = "HOME"; //default SSID
+  networkPassword = "ARjOwI23"; //default password
+  moduleType = "tempHumid"; //default Type
+  dashAddress = "192.168.1.180:8082"; //default IP
+  dashToken = "SmartHome"; //default Token
+}
+
+void initSensors() {
+  dht.begin();
+  sensor_t sensor;
+  dht.temperature().getSensor(&sensor);
+  dht.humidity().getSensor(&sensor);
+  delayMS = sensor.min_delay / 1000;
+}
+
+void postModuleAttributes() {
+  postAttribute("OwnNetworkSSID", tmpOwnSsid);
+  postAttribute("OwnNetworkPassord", ownPassword);
+  postAttribute("OwnNetworkStatus", String(apUpFlag));
+  postAttribute("OwnIP", "http://" + ownIP + "/");
+  postAttribute("InternetSSID", networkSsid);
+  postAttribute("InternetUser", networkUser);
+  postAttribute("InternetPassword", networkPassword);
+  postAttribute("InternetStatus", String(status));
+  postAttribute("ModuleType", moduleType);
+  postAttribute("ThingsBoardAddress", "http://" + dashAddress + "/");
+  postAttribute("ThingsBoardToken", dashToken);
+  postAttribute("InternetIP", networkIP);
 }
 
 void setup() {
@@ -63,48 +89,47 @@ void setup() {
     createAccessPoint();
   }
 
-  dht.begin();
-  sensor_t sensor;
-  dht.temperature().getSensor(&sensor);
-  dht.humidity().getSensor(&sensor);
-  delayMS = sensor.min_delay / 1000;
-
+  initSensors();
 }
 
 void loop()
 {
   status = WiFi.status();
   if (status != WL_CONNECTED)  {
-    if (networkSsid.length() == 0) {
-      scanAndConnectToNetwork();
-    } else {
+    if (networkSsid.length() != 0) {
       connectToWifi(networkSsid, networkPassword);
-      postMessage(tmpOwnSsid, "ssid");
+    }
+    if (status == WL_CONNECTED)  {
+      postModuleAttributes();
+    }
+  }  else  {
+    if (moduleType != "ap") {
+      postSensorsValues();
     }
   }
-  if (status == WL_CONNECTED)  {
-    initSensors();
-  }
-
-
   if (statusAP == 0 && apUpFlag == true) {
     createAccessPoint();
+    if (status == WL_CONNECTED)  {
+      postModuleAttributes();
+    }
   }
   if (statusAP == 1 && apUpFlag == false) {
     disableAccessPoint();
+    if (status == WL_CONNECTED)  {
+      postModuleAttributes();
+    }
   }
   server.handleClient();
 }
 
 void createAccessPoint() {
   Serial.print("Configuring access point for wifi network: ");
-  if (moduleType.length() != 0 && moduleType != "ap") {
-    tmpOwnSsid = ownSsid + "(" + moduleType + ")";
-    //    tmpOwnSsid = ownSsid + "(" + moduleType + ")" + random(1000);
-  } else {
-    tmpOwnSsid = ownSsid;
-  }
-  Serial.println(tmpOwnSsid);
+  //  if (moduleType.length() != 0 && moduleType != "ap") {
+  //    tmpOwnSsid = ownSsid + "(" + moduleType + ")";
+  //  } else {
+  //    tmpOwnSsid = ownSsid;
+  //  }
+  tmpOwnSsid = getTokenValue();
   char ownSsid_char[ownSsid.length() + 1];
   tmpOwnSsid.toCharArray(ownSsid_char, tmpOwnSsid.length() + 1);
   char ownPassword_char[ownPassword.length() + 1];
@@ -113,6 +138,7 @@ void createAccessPoint() {
   statusAP = 1;
   Serial.print("ESP AccessPoint IP address: 192.168.4.1; Status: ");
   Serial.println(statusAP);
+  ownIP = String(WiFi.softAPIP()[0]) + "." + String(WiFi.softAPIP()[1]) + "." + String(WiFi.softAPIP()[2]) + "." + String(WiFi.softAPIP()[3]);
   startServer();
 }
 
@@ -124,28 +150,28 @@ void disableAccessPoint() {
   Serial.println("ESP AccessPoint disabled");
 }
 
-void scanAndConnectToNetwork() {
-  uint8_t encryptionType;
-  int32_t RSSI;
-  uint8_t* BSSID;
-  int32_t channel;
-  bool isHidden;
-  int n = WiFi.scanNetworks();
-  String ssid;
-
-  for (int i = 0; i < n; i++)  {
-    WiFi.getNetworkInfo(i, ssid, encryptionType, RSSI, BSSID, channel, isHidden);
-    //    Serial.printf("%d: %s, Ch:%d (%ddBm) %s %s\n", i + 1, ssid.c_str(), channel, RSSI, encryptionType == ENC_TYPE_NONE ? "open" : "", isHidden ? "hidden" : "");
-
-    //connect to open Wifi;
-    if (status != WL_CONNECTED)    {
-      if (encryptionType == ENC_TYPE_NONE)      {
-        connectToWifi(ssid, "");
-      }
-    }
-  }
-  WiFi.scanDelete();
-}
+//void scanAndConnectToNetwork() {
+//  uint8_t encryptionType;
+//  int32_t RSSI;
+//  uint8_t* BSSID;
+//  int32_t channel;
+//  bool isHidden;
+//  int n = WiFi.scanNetworks();
+//  String ssid;
+//
+//  for (int i = 0; i < n; i++)  {
+//    WiFi.getNetworkInfo(i, ssid, encryptionType, RSSI, BSSID, channel, isHidden);
+//    //    Serial.printf("%d: %s, Ch:%d (%ddBm) %s %s\n", i + 1, ssid.c_str(), channel, RSSI, encryptionType == ENC_TYPE_NONE ? "open" : "", isHidden ? "hidden" : "");
+//
+//    //connect to open Wifi;
+//    if (status != WL_CONNECTED)    {
+//      if (encryptionType == ENC_TYPE_NONE)      {
+//        connectToWifi(ssid, "");
+//      }
+//    }
+//  }
+//  WiFi.scanDelete();
+//}
 
 void configureWebPage() {
   webPage = "<html>\n"
@@ -155,10 +181,10 @@ void configureWebPage() {
             "            <p> <INPUT type=\"text\" name=\"ssid\" value=\"";
   webPage = webPage + networkSsid;
   webPage += "\"> ssid<BR></p>\n"
-             "            <p> <INPUT type=\"text\" name=\"user\" value=\"";
-  webPage = webPage + networkUser;
-  webPage += "\"> user<BR></p>\n"
-             "            <p><INPUT type=\"password\" name=\"password\" value=\"";
+             //             "            <p> <INPUT type=\"text\" name=\"user\" value=\"";
+             //  webPage = webPage + networkUser;
+             //  webPage += "\"> user<BR></p>\n"
+             "            <p><INPUT type=\"text\" name=\"password\" value=\"";
   webPage = webPage + networkPassword;
   webPage += "\"> password<BR></p>\n"
              "            Module params:<br>\n<p>Module type: ";
@@ -170,13 +196,17 @@ void configureWebPage() {
              "            <p> <INPUT type=\"text\" name=\"server\" value=\"";
   webPage = webPage + dashAddress;
   webPage += "\"> server address; format: www.google.com:80 or 192.168.1.1:8080<BR></p>\n"
-             "            <p><INPUT type=\"password\" name=\"token\" value=\"";
+             //             "            <p> <INPUT type=\"text\" name=\"suffix\" value=\"";
+             //  webPage = webPage + suffix;
+             //  webPage += "\"> module suffix<BR></p>\n"
+             "            <p><INPUT type=\"text\" name=\"token\" value=\"";
   webPage = webPage + dashToken;
   webPage += "\"> dashboard token<BR></p>\n"
              "            <p>Module AP status: " ;
   webPage = webPage +  (apUpFlag == true ? "up" : "down") ;
   webPage += "</p>\n"
              "                <input type=\"radio\" name=\"apUpFlag\" value=\"0\">down<Br>\n"
+             "                <input type=\"radio\" name=\"apUpFlag\" value=\"1\">up<Br>\n"
              "            <p><INPUT type =\"submit\" value=\"update\"></p>\n"
              "        </FORM>\n"
              "    </body>\n"
@@ -195,6 +225,7 @@ void startServer() {
     String tmpDashToken = server.arg("token").length() > 0 ? server.arg("token") : dashToken;
     String tmpModuleType = server.arg("module").length() > 0 ? server.arg("module") : moduleType;
     String tmpDashAddress = server.arg("server").length() > 0 ? server.arg("server") : dashAddress;
+    //    String tmpSuffix = server.arg("suffix").length() > 0 ? server.arg("suffix") : suffix;
     apUpFlag = server.arg("apUpFlag") == "0" ? false : true;
 
     if (tmpNetworkSsid.length() != 0) {
@@ -211,17 +242,20 @@ void startServer() {
         moduleType = tmpModuleType;
         disableAccessPoint();
         createAccessPoint();
+        if (status == WL_CONNECTED && dashAddress.length() != 0)  {
+          postModuleAttributes();
+        }
       }
       if (moduleType != "ap") {
         if (tmpDashAddress.length() != 0) {
           dashAddress = tmpDashAddress;
-          //          serverPoint = "http://" + dashAddress + "/api/v1/";
         }
       }
     }
-    if (tmpDashToken.length() != 0) {
+    if (tmpDashToken.length() != 0 && tmpDashToken != "SmartHome") {
       dashToken = tmpDashToken;
-      //      serverPoint = serverPoint + "/telemetry";
+    } else {
+      dashToken = ownSsid;
     }
     if (tmpDashAddress.length() != 0) {
       dashAddress = tmpDashAddress;
@@ -230,13 +264,12 @@ void startServer() {
     String result = webPage;
     result = result + "<p>ESP AP status: " ;
     result = result + (apUpFlag == true ? "up" : "down") + "</p>";
-    result = result + "<p>Attempting to connect to SSID: " + networkSsid + "</p>";
+    result = result + "<p>SSID: " + networkSsid + "</p>";
     result = result + "<p>User name: " + networkUser + "</p>";
     result = result + "<p>User password: " + networkPassword + "</p>";
     result = result + "<p>Dashboard token: " + dashToken + "</p>";
     result = result + "<p>Current module set to: " + moduleType + "</p>";
-    result = result + "<p>Reconfigure WiFi AP to: " + tmpOwnSsid + "</p>";
-    result = result + "<p>Current serverPoint set to: " + serverPoint + "</p>";
+    result = result + "<p>WiFi own SSID : " + getTokenValue() + "</p>";
     result = result + "<p>Dashboard address set to: " + dashAddress + "</p>";
     server.send(200, "text/html", result);
     delay(1000);
@@ -248,18 +281,22 @@ void startServer() {
 void connectToWifi(String ssid,  String password) {
   char ssid_char[ssid.length() + 1];
   ssid.toCharArray(ssid_char, ssid.length() + 1);
+  Serial.print("Attempting to connect to SSID: ");
+  Serial.print(ssid_char);
+  //  if (arduino_ip) {
+  //    IPAddress arduino_ip ( 192,  168,   10,  1);
+  //    IPAddress dns_ip     (  8,   8,   8,   8);
+  //    IPAddress gateway_ip ( 192,  168,   1,   1);
+  //    IPAddress subnet_mask(255, 255, 255,   0);
+  //    WiFi.config(arduino_ip, gateway_ip, subnet_mask);
+  //  }
   if (password.length() != 0) {
     char password_char[password.length() + 1];
     password.toCharArray(password_char, password.length() + 1);
-    Serial.println(password_char);
-    Serial.print("Attempting to connect to SSID: ");
-    Serial.print(ssid_char);
     Serial.print(" with password: ");
     Serial.println(password_char);
     status = WiFi.begin(ssid_char, password_char);
   } else {
-    Serial.print("Attempting to connect to open SSID: ");
-    Serial.println(ssid_char);
     status = WiFi.begin(ssid_char);
   }
   int counter = 0;
@@ -270,15 +307,14 @@ void connectToWifi(String ssid,  String password) {
     counter++;
   }
   if (status == WL_CONNECTED) {
-    server.send(200, "text/html", webPage + "NodeMCU connected to the network");
-    Serial.println("NodeMCU connected to the network");
+    networkIP =  String(WiFi.localIP()[0]) + "." + String(WiFi.localIP()[1]) + "." + String(WiFi.localIP()[2]) + "." + String(WiFi.localIP()[3]);
+    Serial.println("NodeMCU connected to the network: " + ssid + " with password: " + ownPassword);
   } else {
-    server.send(200, "text/html", webPage + "NodeMCU NOT connected to the network");
     Serial.println("NodeMCU NOT connected to the network");
   }
 }
 
-void initSensors() {
+void postSensorsValues() {
   delay(delayMS);
   // Get temperature event and print its value.
   sensors_event_t event;
@@ -290,11 +326,7 @@ void initSensors() {
     Serial.print("Temperature: ");
     Serial.print(event.temperature);
     Serial.println(" *C");
-    postMessage(event.temperature, "temperature");
-    //    digitalWrite(tempPin, HIGH);   // turn the LED on (HIGH is the voltage level)
-    //    delay(1000);                       // wait for a second
-    //    digitalWrite(tempPin, LOW);    // turn the LED off by making the voltage LOW
-    //    delay(1000);                       // wait for a second
+    postTelemetry("temperature", event.temperature);
   }
   // Get humidity event and print its value.
   dht.humidity().getEvent(&event);
@@ -305,11 +337,7 @@ void initSensors() {
     Serial.print("Humidity: ");
     Serial.print(event.relative_humidity);
     Serial.println("%");
-    postMessage(event.relative_humidity, "humidity");
-    //    digitalWrite(humPin, HIGH);   // turn the LED on (HIGH is the voltage level)
-    //    delay(1000);                       // wait for a second
-    //    digitalWrite(humPin, LOW);    // turn the LED off by making the voltage LOW
-    //    delay(1000);                       // wait for a second
+    postTelemetry("humidity", event.relative_humidity);
   }
   //  Get voltage
   {
@@ -317,35 +345,63 @@ void initSensors() {
     vdd = vdd / 1000;
     Serial.print("Voltage: ");
     Serial.print(vdd);
-    Serial.println("V");
-    postMessage(vdd, "voltage");
+    Serial.println(" V");
+    postTelemetry("voltage", vdd);
   }
 }
 
-void postMessage(float value, String type) {
-  postMessage(String(value), type);
+void postTelemetry(String type, float value) {
+  postTelemetry(type, String(value));
 }
 
-void postMessage(String value, String type) {
+void postTelemetry(String type, String value) {
+  String serverPoint;
   if (moduleType != "ap") {
     if (dashAddress.length() != 0) {
       serverPoint = "http://" + dashAddress + "/api/v1/";
     }
   }
   if (dashToken.length() != 0) {
-    serverPoint = serverPoint + dashToken + "/telemetry";
+    serverPoint = serverPoint + getTokenValue() + "/telemetry";
   }
   if (serverPoint.length() != 0) {
     String message = "{\n \"";
     message = message + type;
-    message = message +  "\":";
+    message = message +  "\":\"";
     message = message + value;
-    message = message +  "\n}";
-    Serial.println("Server:\n" + serverPoint + "; \nMessage:\n" + message);
+    message = message +  "\"\n}";
+    Serial.println("Server: " + serverPoint + "; \nMessage: " + message);
+    sendPost(message, serverPoint);
+  } else {
+    Serial.println("Need to set server and module type via SSID: " + tmpOwnSsid);
+  }
+}
 
+void postAttribute(String type, String value) {
+  String serverPoint;
+  if (dashAddress.length() != 0) {
+    serverPoint = "http://" + dashAddress + "/api/v1/";
+  }
+  if (dashToken.length() != 0) {
+    serverPoint = serverPoint + getTokenValue() + "/attributes";
+  }
+  if (serverPoint.length() != 0) {
+    String message = "{\n \"";
+    message = message + type;
+    message = message +  "\":\"";
+    message = message + value;
+    message = message +  "\"\n}";
+    Serial.println("Server: " + serverPoint + "; \nMessage: " + message);
+    sendPost(message, serverPoint);
+  } else {
+    Serial.println("Need to set server and module type via SSID: " + tmpOwnSsid);
+  }
+}
+
+void sendPost(String message, String serverPoint) {
+  if (netExceptionCounter < 20) {
     HTTPClient http;
     http.begin(serverPoint);
-    //    http.addHeader("Accept-Encoding", "gzip, deflate");
     http.addHeader("Content-Type", "application/json");
     int httpCode = http.POST(message);
     if (httpCode > 0) {
@@ -353,13 +409,32 @@ void postMessage(String value, String type) {
       if (httpCode == HTTP_CODE_OK) {
         String payload = http.getString();
         Serial.println(payload);
+        netExceptionCounter = 0;
       }
     } else {
       Serial.printf("[HTTP] POST... failed, error: % s\n", http.errorToString(httpCode).c_str());
+      netExceptionCounter = netExceptionCounter + 1 ;
     }
     delay(1000);
     http.end();
   } else {
-    Serial.println("Need to set server and module type via SSID: " + tmpOwnSsid);
+    ESP.restart();
   }
 }
+
+String getTokenValue() {
+  Serial.print(" -> ");
+  String value;
+  if (moduleType.length() != 0 && moduleType != "ap") {
+    value = ownSsid + "(" + moduleType + ")";
+    if (dashToken.length() != 0 && dashToken != "SmartHome") {
+      value = value + dashToken;
+    }
+  } else {
+    value = ownSsid;
+  }
+  Serial.println(value);
+  return value;
+}
+
+
