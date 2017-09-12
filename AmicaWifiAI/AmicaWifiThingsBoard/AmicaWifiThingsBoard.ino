@@ -426,7 +426,7 @@ String getTokenValue() {
   Serial.print(" -> ");
   String value;
   if (moduleType.length() != 0 && moduleType != "ap") {
-    value = ownSsid + "(" + moduleType + ")";
+    value = "SH(" + moduleType + ")";
     if (dashToken.length() != 0 && dashToken != "SmartHome") {
       value = value + dashToken;
     }
