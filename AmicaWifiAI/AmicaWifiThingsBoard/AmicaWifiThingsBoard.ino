@@ -1,23 +1,17 @@
 #include <Adafruit_Sensor.h>
 #include <DHT.h>
 #include <DHT_U.h>
-
 #define DHTPIN            2         // Pin which is connected to the DHT sensor.
-
 #define DHTTYPE           DHT11     // DHT 11 
 
-DHT_Unified dht(DHTPIN, DHTTYPE);
-
-uint32_t delayMS;
-
 #include <Arduino.h>
-
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266HTTPClient.h>
 #include <ArduinoJson.h>
 #include "FS.h"
 
+DHT_Unified dht(DHTPIN, DHTTYPE);
 ADC_MODE(ADC_VCC); //vcc read
 int status = WL_IDLE_STATUS;
 int statusAP = WL_IDLE_STATUS;
@@ -37,10 +31,9 @@ boolean apUpFlag = true;
 int netExceptionCounter = 0;
 int netConnectExceptionCounter = 0;
 boolean isAttributesSet = false;
+boolean isSavedParams = false;
 
 ESP8266WebServer server(80);
-const int tempPin = 4;
-const int humPin = 5;
 String webPage = "";
 
 //void setup() {
@@ -62,19 +55,16 @@ String webPage = "";
 //}
 
 void setup() {
-  pinMode(tempPin, OUTPUT);
-  pinMode(humPin, OUTPUT);
   Serial.begin(9600);
   Serial.println();
 
-  initDefNetwork();
+  //  initDefNetwork();
 
   tmpOwnSsid = ownSsid;
   Serial.setDebugOutput(true);
 
   disableAccessPoint();
   disconnectFromWifi();
-  loadConfig();
 
   //configureWebPage
   configureWebPage();
@@ -89,6 +79,7 @@ void loop() {
   status = WiFi.status();
   postModuleAttributes();
   if (status != WL_CONNECTED)  {
+    loadConfig();
     connectToWifi(networkSsid, networkPassword);
   }  else  {
     postSensorsValues();
@@ -226,6 +217,11 @@ void startServer() {
     server.send(200, "text/html", webPage);
     delay(1000);
   });
+  server.on("/action", []() {
+    Serial.println("Action POST");
+    server.send(200, "text/html", "PING");
+    delay(1000);
+  });
   server.on("/", []() {
     Serial.println("Get request params");
     for (int i = 0; i <   server.args(); i++ ) {
@@ -333,6 +329,7 @@ void connectToWifi(String ssid,  String password) {
 void disconnectFromWifi() {
   isAttributesSet = false;
   status = WiFi.disconnect();
+  isSavedParams = false;
   Serial.println("Disconnected form wifi");
 }
 
@@ -371,7 +368,7 @@ void postSensorsValues() {
       Serial.println(" V");
       postTelemetry("voltage", vdd);
     }
-    delay(5000);
+    //    delay(2500);
   }
 }
 
@@ -439,6 +436,10 @@ void sendPost(String message, String serverPoint) {
         String payload = http.getString();
         Serial.println(payload);
         netExceptionCounter = 0;
+        if (isSavedParams == false) {
+          saveConfig();
+          isSavedParams = true;
+        }
         status = WiFi.status();
       }
     } else {
@@ -510,6 +511,8 @@ String loadConfig() {
   dashAddress = CdashAddress;
   const char * CdashToken = parsed["ThingsBoardToken"];
   dashToken = CdashToken;
+  Serial.println("Load config");
+  Serial.println(prepareConfig());
   return prepareConfig();
 }
 
