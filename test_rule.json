@@ -1,0 +1,41 @@
+{
+  "name": "Test rule",
+  "state": "ACTIVE",
+  "weight": 0,
+  "pluginToken": null,
+  "filters": [
+    {
+      "configuration": {
+        "messageTypes": [
+          "POST_TELEMETRY"
+        ]
+      },
+      "name": "Message Type Filter",
+      "clazz": "org.thingsboard.server.extensions.core.filter.MsgTypeFilter"
+    },
+    {
+      "configuration": {
+        "filter": "typeof temperature !== 'undefined' || typeof humidity !== 'undefined'"
+      },
+      "clazz": "org.thingsboard.server.extensions.core.filter.DeviceTelemetryFilter",
+      "name": "Device Telemetry Filter"
+    }
+  ],
+  "processor": {
+    "configuration": {
+      "alarmPropagateFlag": true,
+      "alarmDetailsTemplate": "{\"text\":\"Temp ALARM!\"}",
+      "newAlarmExpression": "(temperature <= 22 || temperature >= 25)\n||\n( humidity <= 40 || humidity >= 60)\n",
+      "alarmSeverity": "MAJOR",
+      "alarmStatus": "ACTIVE_ACK",
+      "clearAlarmExpression": "(temperature > 22 || temperature < 25)\n||\n( humidity > 40 || humidity < 60)\n",
+      "alarmTypeTemplate": "Alarm"
+    },
+    "clazz": "org.thingsboard.server.extensions.core.processor.AlarmProcessor",
+    "name": "Alarm"
+  },
+  "action": null,
+  "additionalInfo": {
+    "description": "Test rule"
+  }
+}

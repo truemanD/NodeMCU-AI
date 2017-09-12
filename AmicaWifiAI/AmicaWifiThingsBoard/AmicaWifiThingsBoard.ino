@@ -15,35 +15,102 @@ uint32_t delayMS;
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266HTTPClient.h>
+#include <ArduinoJson.h>
+#include "FS.h"
 
 ADC_MODE(ADC_VCC); //vcc read
 int status = WL_IDLE_STATUS;
 int statusAP = WL_IDLE_STATUS;
 String ownSsid = "SmartHome";
-String tmpOwnSsid;
+String tmpOwnSsid = "";
 String ownPassword = "SmartHome";
-String ownIP;
-String networkSsid;
-String networkUser;
-String networkPassword ;
-String networkIP ;
+String ownIP = "";
+String networkSsid = "";
+String networkUser = "";
+String networkPassword = "";
+String networkIP = "";
 String moduleType = "ap";
-String dashAddress;
+String dashAddress = "";
 String dashToken = "SmartHome";
 //String suffix;
 boolean apUpFlag = true;
 int netExceptionCounter = 0;
+int netConnectExceptionCounter = 0;
+boolean isAttributesSet = false;
 
 ESP8266WebServer server(80);
 const int tempPin = 4;
 const int humPin = 5;
 String webPage = "";
 
+//void setup() {
+//  Serial.begin(9600);
+//  Serial.println();
+//  Serial.println("-------");
+//  if (!saveConfig()) {
+//    Serial.println("Save exception");
+//  } else {
+//    Serial.println("Load config");
+//    Serial.println(loadConfig());
+//  }
+//  Serial.println("-------");
+//}
+
+
+
+//void loop() {
+//}
+
+void setup() {
+  pinMode(tempPin, OUTPUT);
+  pinMode(humPin, OUTPUT);
+  Serial.begin(9600);
+  Serial.println();
+
+  initDefNetwork();
+
+  tmpOwnSsid = ownSsid;
+  Serial.setDebugOutput(true);
+
+  disableAccessPoint();
+  disconnectFromWifi();
+  loadConfig();
+
+  //configureWebPage
+  configureWebPage();
+
+  //  create AP
+  createAccessPoint();
+
+  initSensors();
+}
+
+void loop() {
+  status = WiFi.status();
+  postModuleAttributes();
+  if (status != WL_CONNECTED)  {
+    connectToWifi(networkSsid, networkPassword);
+  }  else  {
+    postSensorsValues();
+  }
+  if (statusAP == 0 && apUpFlag == true) {
+    createAccessPoint();
+    postModuleAttributes();
+  }
+  if (statusAP == 1 && apUpFlag == false) {
+    disableAccessPoint();
+    postModuleAttributes();
+  }
+  server.handleClient();
+}
+
+//Network configuration
+
 void initDefNetwork() {
   networkSsid = "HOME"; //default SSID
   networkPassword = "ARjOwI23"; //default password
   moduleType = "tempHumid"; //default Type
-  dashAddress = "192.168.1.180:8082"; //default IP
+  dashAddress = "171.25.167.194:8082"; //default Address
   dashToken = "SmartHome"; //default Token
 }
 
@@ -68,78 +135,25 @@ void postModuleAttributes() {
   postAttribute("ThingsBoardAddress", "http://" + dashAddress + "/");
   postAttribute("ThingsBoardToken", dashToken);
   postAttribute("InternetIP", networkIP);
-}
-
-void setup() {
-  pinMode(tempPin, OUTPUT);
-  pinMode(humPin, OUTPUT);
-  Serial.begin(9600);
-  Serial.println();
-
-  initDefNetwork();
-
-  tmpOwnSsid = ownSsid;
-  Serial.setDebugOutput(true);
-
-  //configureWebPage
-  configureWebPage();
-
-  //  create AP
-  if (apUpFlag == true) {
-    createAccessPoint();
-  }
-
-  initSensors();
-}
-
-void loop()
-{
-  status = WiFi.status();
-  if (status != WL_CONNECTED)  {
-    if (networkSsid.length() != 0) {
-      connectToWifi(networkSsid, networkPassword);
-    }
-    if (status == WL_CONNECTED)  {
-      postModuleAttributes();
-    }
-  }  else  {
-    if (moduleType != "ap") {
-      postSensorsValues();
-    }
-  }
-  if (statusAP == 0 && apUpFlag == true) {
-    createAccessPoint();
-    if (status == WL_CONNECTED)  {
-      postModuleAttributes();
-    }
-  }
-  if (statusAP == 1 && apUpFlag == false) {
-    disableAccessPoint();
-    if (status == WL_CONNECTED)  {
-      postModuleAttributes();
-    }
-  }
-  server.handleClient();
+  isAttributesSet = true;
 }
 
 void createAccessPoint() {
-  Serial.print("Configuring access point for wifi network: ");
-  //  if (moduleType.length() != 0 && moduleType != "ap") {
-  //    tmpOwnSsid = ownSsid + "(" + moduleType + ")";
-  //  } else {
-  //    tmpOwnSsid = ownSsid;
-  //  }
-  tmpOwnSsid = getTokenValue();
-  char ownSsid_char[ownSsid.length() + 1];
-  tmpOwnSsid.toCharArray(ownSsid_char, tmpOwnSsid.length() + 1);
-  char ownPassword_char[ownPassword.length() + 1];
-  ownPassword.toCharArray(ownPassword_char, ownPassword.length() + 1);
-  WiFi.softAP(ownSsid_char, ownPassword_char);
-  statusAP = 1;
-  Serial.print("ESP AccessPoint IP address: 192.168.4.1; Status: ");
-  Serial.println(statusAP);
-  ownIP = String(WiFi.softAPIP()[0]) + "." + String(WiFi.softAPIP()[1]) + "." + String(WiFi.softAPIP()[2]) + "." + String(WiFi.softAPIP()[3]);
-  startServer();
+  if (apUpFlag == true) {
+    disableAccessPoint();
+    Serial.print("Configuring access point for wifi network: ");
+    tmpOwnSsid = getTokenValue();
+    char ownSsid_char[ownSsid.length() + 1];
+    tmpOwnSsid.toCharArray(ownSsid_char, tmpOwnSsid.length() + 1);
+    char ownPassword_char[ownPassword.length() + 1];
+    ownPassword.toCharArray(ownPassword_char, ownPassword.length() + 1);
+    WiFi.softAP(ownSsid_char, ownPassword_char);
+    statusAP = 1;
+    Serial.print("ESP AccessPoint IP address: 192.168.4.1; Status: ");
+    Serial.println(statusAP);
+    ownIP = String(WiFi.softAPIP()[0]) + "." + String(WiFi.softAPIP()[1]) + "." + String(WiFi.softAPIP()[2]) + "." + String(WiFi.softAPIP()[3]);
+    startServer();
+  }
 }
 
 void disableAccessPoint() {
@@ -147,50 +161,28 @@ void disableAccessPoint() {
   Serial.println(tmpOwnSsid);
   WiFi.softAPdisconnect(true);
   statusAP = 0;
+  isAttributesSet = false;
   Serial.println("ESP AccessPoint disabled");
 }
-
-//void scanAndConnectToNetwork() {
-//  uint8_t encryptionType;
-//  int32_t RSSI;
-//  uint8_t* BSSID;
-//  int32_t channel;
-//  bool isHidden;
-//  int n = WiFi.scanNetworks();
-//  String ssid;
-//
-//  for (int i = 0; i < n; i++)  {
-//    WiFi.getNetworkInfo(i, ssid, encryptionType, RSSI, BSSID, channel, isHidden);
-//    //    Serial.printf("%d: %s, Ch:%d (%ddBm) %s %s\n", i + 1, ssid.c_str(), channel, RSSI, encryptionType == ENC_TYPE_NONE ? "open" : "", isHidden ? "hidden" : "");
-//
-//    //connect to open Wifi;
-//    if (status != WL_CONNECTED)    {
-//      if (encryptionType == ENC_TYPE_NONE)      {
-//        connectToWifi(ssid, "");
-//      }
-//    }
-//  }
-//  WiFi.scanDelete();
-//}
 
 void configureWebPage() {
   webPage = "<html>\n"
             "    <body>\n"
             "        <FORM name=\"module\" action=\"/\" method=\"post\">\n"
             "            Network params:<br>\n"
-            "            <p> <INPUT type=\"text\" name=\"ssid\" value=\"";
+            "            <p> <INPUT type=\"text\" name=\"ssid\" required value=\"";
   webPage = webPage + networkSsid;
   webPage += "\"> ssid<BR></p>\n"
              //             "            <p> <INPUT type=\"text\" name=\"user\" value=\"";
              //  webPage = webPage + networkUser;
              //  webPage += "\"> user<BR></p>\n"
-             "            <p><INPUT type=\"text\" name=\"password\" value=\"";
+             "            <p><INPUT type=\"text\" name=\"password\" required value=\"";
   webPage = webPage + networkPassword;
   webPage += "\"> password<BR></p>\n"
              "            Module params:<br>\n<p>Module type: ";
   webPage = webPage + moduleType;
   webPage += "</p>\n"
-             "            <p><input type=\"radio\" name=\"module\" value=\"tempHumid\">tempHumid<Br>\n"
+             "            <p><input type=\"radio\" name=\"module\" value=\"tempHumid\" required>tempHumid<Br>\n"
              "                <input type=\"radio\" name=\"module\" value=\"motion\">motion<Br>\n"
              "                <input type=\"radio\" name=\"module\" value=\"ap\">access point</p>\n"
              "            <p> <INPUT type=\"text\" name=\"server\" value=\"";
@@ -199,7 +191,7 @@ void configureWebPage() {
              //             "            <p> <INPUT type=\"text\" name=\"suffix\" value=\"";
              //  webPage = webPage + suffix;
              //  webPage += "\"> module suffix<BR></p>\n"
-             "            <p><INPUT type=\"text\" name=\"token\" value=\"";
+             "            <p><INPUT type=\"text\" name=\"token\" required value=\"";
   webPage = webPage + dashToken;
   webPage += "\"> dashboard token<BR></p>\n"
              "            <p>Module AP status: " ;
@@ -214,6 +206,26 @@ void configureWebPage() {
 }
 
 void startServer() {
+  server.on("/default", []() {
+    Serial.println("Set default network values");
+    initDefNetwork();
+    configureWebPage();
+    server.send(200, "text/html", webPage);
+    delay(1000);
+  });
+  server.on("/save_config", []() {
+    Serial.println("saveConfig");
+    saveConfig();
+    configureWebPage();
+    server.send(200, "text/html", webPage);
+    delay(1000);
+  });  server.on("/load_config", []() {
+    Serial.println("loadConfig");
+    loadConfig();
+    configureWebPage();
+    server.send(200, "text/html", webPage);
+    delay(1000);
+  });
   server.on("/", []() {
     Serial.println("Get request params");
     for (int i = 0; i <   server.args(); i++ ) {
@@ -240,11 +252,7 @@ void startServer() {
     if (tmpModuleType.length() != 0) {
       if (tmpModuleType != moduleType) {
         moduleType = tmpModuleType;
-        disableAccessPoint();
         createAccessPoint();
-        if (status == WL_CONNECTED && dashAddress.length() != 0)  {
-          postModuleAttributes();
-        }
       }
       if (moduleType != "ap") {
         if (tmpDashAddress.length() != 0) {
@@ -279,74 +287,91 @@ void startServer() {
 }
 
 void connectToWifi(String ssid,  String password) {
-  char ssid_char[ssid.length() + 1];
-  ssid.toCharArray(ssid_char, ssid.length() + 1);
-  Serial.print("Attempting to connect to SSID: ");
-  Serial.print(ssid_char);
-  //  if (arduino_ip) {
-  //    IPAddress arduino_ip ( 192,  168,   10,  1);
-  //    IPAddress dns_ip     (  8,   8,   8,   8);
-  //    IPAddress gateway_ip ( 192,  168,   1,   1);
-  //    IPAddress subnet_mask(255, 255, 255,   0);
-  //    WiFi.config(arduino_ip, gateway_ip, subnet_mask);
-  //  }
-  if (password.length() != 0) {
-    char password_char[password.length() + 1];
-    password.toCharArray(password_char, password.length() + 1);
-    Serial.print(" with password: ");
-    Serial.println(password_char);
-    status = WiFi.begin(ssid_char, password_char);
-  } else {
-    status = WiFi.begin(ssid_char);
-  }
-  int counter = 0;
-  while (status != WL_CONNECTED && counter < 20)
-  {
-    delay(500);
-    status = WiFi.status();
-    counter++;
-  }
-  if (status == WL_CONNECTED) {
-    networkIP =  String(WiFi.localIP()[0]) + "." + String(WiFi.localIP()[1]) + "." + String(WiFi.localIP()[2]) + "." + String(WiFi.localIP()[3]);
-    Serial.println("NodeMCU connected to the network: " + ssid + " with password: " + ownPassword);
-  } else {
-    Serial.println("NodeMCU NOT connected to the network");
+  if (status != WL_CONNECTED && ssid.length() != 0 ) {
+    Serial.printf("Network connecting exception counter: % d\n", netConnectExceptionCounter);
+    if ( netConnectExceptionCounter < 10) {
+      disconnectFromWifi();
+      char ssid_char[ssid.length() + 1];
+      ssid.toCharArray(ssid_char, ssid.length() + 1);
+      Serial.print("Attempting to connect to SSID: ");
+      Serial.print(ssid_char);
+      if (password.length() != 0) {
+        char password_char[password.length() + 1];
+        password.toCharArray(password_char, password.length() + 1);
+        Serial.print(" with password: ");
+        Serial.println(password_char);
+        status = WiFi.begin(ssid_char, password_char);
+      } else {
+        status = WiFi.begin(ssid_char);
+      }
+      int counter = 0;
+      while (status != WL_CONNECTED && counter < 10)
+      {
+        delay(1000);
+        status = WiFi.status();
+        counter++;
+      }
+      if (status == WL_CONNECTED) {
+        networkIP =  String(WiFi.localIP()[0]) + "." + String(WiFi.localIP()[1]) + "." + String(WiFi.localIP()[2]) + "." + String(WiFi.localIP()[3]);
+        Serial.println("NodeMCU connected to the network: " + ssid + " with password: " + ownPassword);
+        netConnectExceptionCounter = 0;
+      } else {
+        Serial.println("NodeMCU NOT connected to the network");
+        netConnectExceptionCounter = netConnectExceptionCounter + 1;
+        disconnectFromWifi();
+      }
+    } else {
+      Serial.println("Network connecting exception counter exceed limit. Check network SSID and password. Sleep for 1 minute");
+      netConnectExceptionCounter = 0;
+      delay(60000);
+      //            networkSsid = "";
+      //            networkPassword = "";
+    }
   }
 }
 
+void disconnectFromWifi() {
+  isAttributesSet = false;
+  status = WiFi.disconnect();
+  Serial.println("Disconnected form wifi");
+}
+
 void postSensorsValues() {
-  delay(delayMS);
-  // Get temperature event and print its value.
-  sensors_event_t event;
-  dht.temperature().getEvent(&event);
-  if (isnan(event.temperature)) {
-    Serial.println("Error reading temperature!");
-  }
-  else {
-    Serial.print("Temperature: ");
-    Serial.print(event.temperature);
-    Serial.println(" *C");
-    postTelemetry("temperature", event.temperature);
-  }
-  // Get humidity event and print its value.
-  dht.humidity().getEvent(&event);
-  if (isnan(event.relative_humidity)) {
-    Serial.println("Error reading humidity!");
-  }
-  else {
-    Serial.print("Humidity: ");
-    Serial.print(event.relative_humidity);
-    Serial.println("%");
-    postTelemetry("humidity", event.relative_humidity);
-  }
-  //  Get voltage
-  {
-    float vdd = ESP.getVcc();
-    vdd = vdd / 1000;
-    Serial.print("Voltage: ");
-    Serial.print(vdd);
-    Serial.println(" V");
-    postTelemetry("voltage", vdd);
+  if (status == WL_CONNECTED && moduleType != "ap") {
+    delay(delayMS);
+    // Get temperature event and print its value.
+    sensors_event_t event;
+    dht.temperature().getEvent(&event);
+    if (isnan(event.temperature)) {
+      Serial.println("Error reading temperature!");
+    }
+    else {
+      Serial.print("Temperature: ");
+      Serial.print(event.temperature);
+      Serial.println(" *C");
+      postTelemetry("temperature", event.temperature);
+    }
+    // Get humidity event and print its value.
+    dht.humidity().getEvent(&event);
+    if (isnan(event.relative_humidity)) {
+      Serial.println("Error reading humidity!");
+    }
+    else {
+      Serial.print("Humidity: ");
+      Serial.print(event.relative_humidity);
+      Serial.println("%");
+      postTelemetry("humidity", event.relative_humidity);
+    }
+    //  Get voltage
+    {
+      float vdd = ESP.getVcc();
+      vdd = vdd / 1000;
+      Serial.print("Voltage: ");
+      Serial.print(vdd);
+      Serial.println(" V");
+      postTelemetry("voltage", vdd);
+    }
+    delay(5000);
   }
 }
 
@@ -355,46 +380,50 @@ void postTelemetry(String type, float value) {
 }
 
 void postTelemetry(String type, String value) {
-  String serverPoint;
-  if (moduleType != "ap") {
-    if (dashAddress.length() != 0) {
-      serverPoint = "http://" + dashAddress + "/api/v1/";
+  if (status == WL_CONNECTED) {
+    String serverPoint;
+    if (moduleType != "ap") {
+      if (dashAddress.length() != 0) {
+        serverPoint = "http://" + dashAddress + "/api/v1/";
+      }
     }
-  }
-  if (dashToken.length() != 0) {
-    serverPoint = serverPoint + getTokenValue() + "/telemetry";
-  }
-  if (serverPoint.length() != 0) {
-    String message = "{\n \"";
-    message = message + type;
-    message = message +  "\":\"";
-    message = message + value;
-    message = message +  "\"\n}";
-    Serial.println("Server: " + serverPoint + "; \nMessage: " + message);
-    sendPost(message, serverPoint);
-  } else {
-    Serial.println("Need to set server and module type via SSID: " + tmpOwnSsid);
+    if (dashToken.length() != 0) {
+      serverPoint = serverPoint + getTokenValue() + "/telemetry";
+    }
+    if (serverPoint.length() != 0) {
+      String message = "{\n \"";
+      message = message + type;
+      message = message +  "\":\"";
+      message = message + value;
+      message = message +  "\"\n}";
+      Serial.println("Server: " + serverPoint + "; \nMessage: " + message);
+      sendPost(message, serverPoint);
+    } else {
+      Serial.println("Need to set server and module type via SSID: " + tmpOwnSsid);
+    }
   }
 }
 
 void postAttribute(String type, String value) {
-  String serverPoint;
-  if (dashAddress.length() != 0) {
-    serverPoint = "http://" + dashAddress + "/api/v1/";
-  }
-  if (dashToken.length() != 0) {
-    serverPoint = serverPoint + getTokenValue() + "/attributes";
-  }
-  if (serverPoint.length() != 0) {
-    String message = "{\n \"";
-    message = message + type;
-    message = message +  "\":\"";
-    message = message + value;
-    message = message +  "\"\n}";
-    Serial.println("Server: " + serverPoint + "; \nMessage: " + message);
-    sendPost(message, serverPoint);
-  } else {
-    Serial.println("Need to set server and module type via SSID: " + tmpOwnSsid);
+  if (status == WL_CONNECTED && isAttributesSet == false && netExceptionCounter < 3) {
+    String serverPoint;
+    if (dashAddress.length() != 0) {
+      serverPoint = "http://" + dashAddress + "/api/v1/";
+    }
+    if (dashToken.length() != 0) {
+      serverPoint = serverPoint + getTokenValue() + "/attributes";
+    }
+    if (serverPoint.length() != 0) {
+      String message = "{\n \"";
+      message = message + type;
+      message = message +  "\":\"";
+      message = message + value;
+      message = message +  "\"\n}";
+      Serial.println("Server: " + serverPoint + "; \nMessage: " + message);
+      sendPost(message, serverPoint);
+    } else {
+      Serial.println("Need to set server and module type via SSID: " + tmpOwnSsid);
+    }
   }
 }
 
@@ -410,15 +439,22 @@ void sendPost(String message, String serverPoint) {
         String payload = http.getString();
         Serial.println(payload);
         netExceptionCounter = 0;
+        status = WiFi.status();
       }
     } else {
       Serial.printf("[HTTP] POST... failed, error: % s\n", http.errorToString(httpCode).c_str());
       netExceptionCounter = netExceptionCounter + 1 ;
+      status = WiFi.status();
     }
-    delay(1000);
+    delay(200);
     http.end();
   } else {
-    ESP.restart();
+    Serial.println("Address exception counter exceed limit. Check address and token. Sleep for 1 minute.");
+    netExceptionCounter = 0;
+    delay(60000);
+    //    dashAddress = "";
+    //    dashToken = ownSsid;
+    //    ESP.restart();
   }
 }
 
@@ -438,3 +474,123 @@ String getTokenValue() {
 }
 
 
+//Store values
+
+boolean saveConfig() {
+  String value = prepareConfig();
+  Serial.println("Save config");
+  Serial.println(value);
+  return fileWrite("/config.json", value);
+}
+
+String loadConfig() {
+  String content = fileRead("/config.json");
+  char value[content.length() + 1];
+  content.toCharArray(value, content.length() + 1);
+  StaticJsonBuffer<300> JSONBuffer;
+  JsonObject&  parsed = JSONBuffer.parseObject(value);
+  if (!parsed.success()) {   //Check for errors in parsing
+    Serial.println("Parsing failed");
+    delay(5000);
+    return "";
+  }
+  const char * CtmpOwnSsid = parsed["OwnNetworkSSID"];
+  tmpOwnSsid = CtmpOwnSsid;
+  const char * CownPassword = parsed["OwnNetworkPassord"];
+  ownPassword = CownPassword;
+  const char * CnetworkSsid = parsed["InternetSSID"];
+  networkSsid = CnetworkSsid;
+  const char * CnetworkUser = parsed["InternetUser"];
+  networkUser = CnetworkUser;
+  const char * CnetworkPassword = parsed["InternetPassword"];
+  networkPassword = CnetworkPassword;
+  const char * CmoduleType = parsed["ModuleType"];
+  moduleType = CmoduleType;
+  const char * CdashAddress = parsed["ThingsBoardAddress"];
+  dashAddress = CdashAddress;
+  const char * CdashToken = parsed["ThingsBoardToken"];
+  dashToken = CdashToken;
+  return prepareConfig();
+}
+
+String prepareConfig() {
+  String result =  "{\"OwnNetworkSSID\":\"" + tmpOwnSsid;
+  result = result + "\",\"OwnNetworkPassord\":\"" + ownPassword;
+  result = result + "\",\"OwnNetworkStatus\":\"" + String(apUpFlag);
+  result = result + "\",\"OwnIP\":\"" + ownIP;
+  result = result + "\",\"InternetSSID\":\"" + networkSsid;
+  result = result + "\",\"InternetUser\":\"" + networkUser;
+  result = result + "\",\"InternetPassword\":\"" + networkPassword;
+  result = result + "\",\"ModuleType\":\"" + moduleType;
+  result = result + "\",\"ThingsBoardAddress\":\"" + dashAddress ;
+  result = result + "\",\"ThingsBoardToken\":\"" + dashToken;
+  result = result + "\",\"InternetIP\":\"" + networkIP;
+  result = result + "\"}";
+  return result;
+}
+
+boolean fileWrite(String name, String content) {
+  SPIFFS.begin();
+  File file = SPIFFS.open(name.c_str(), "w");
+  if (!file) {
+    String errorMessage = "Can't open '" + name + "' !\r\n";
+    Serial.println(errorMessage);
+    return false;
+  } else {
+    file.write((uint8_t *)content.c_str(), content.length());
+    file.close();
+    return true;
+  }
+}
+
+String fileRead(String name) {
+  SPIFFS.begin();
+  String contents;
+  File file = SPIFFS.open(name.c_str(), "r");
+  if (!file) {
+    String errorMessage = "Can't open '" + name + "' !\r\n";
+    Serial.println(errorMessage);
+    return "FILE ERROR";
+  }
+  else {
+    int fileSize = file.size();
+    int chunkSize = 1024;
+    char buf[chunkSize];
+    int numberOfChunks = (fileSize / chunkSize) + 1;
+    int remainingChunks = fileSize;
+    for (int i = 1; i <= numberOfChunks; i++) {
+      if (remainingChunks - chunkSize < 0) {
+        chunkSize = remainingChunks;
+      }
+      file.read((uint8_t *)buf, chunkSize);
+      remainingChunks = remainingChunks - chunkSize;
+      contents += String(buf);
+    }
+    file.close();
+    return contents;
+  }
+}
+
+
+//void scanAndConnectToNetwork() {
+//  uint8_t encryptionType;
+//  int32_t RSSI;
+//  uint8_t* BSSID;
+//  int32_t channel;
+//  bool isHidden;
+//  int n = WiFi.scanNetworks();
+//  String ssid;
+//
+//  for (int i = 0; i < n; i++)  {
+//    WiFi.getNetworkInfo(i, ssid, encryptionType, RSSI, BSSID, channel, isHidden);
+//    //    Serial.printf("%d: %s, Ch:%d (%ddBm) %s %s\n", i + 1, ssid.c_str(), channel, RSSI, encryptionType == ENC_TYPE_NONE ? "open" : "", isHidden ? "hidden" : "");
+//
+//    //connect to open Wifi;
+//    if (status != WL_CONNECTED)    {
+//      if (encryptionType == ENC_TYPE_NONE)      {
+//        connectToWifi(ssid, "");
+//      }
+//    }
+//  }
+//  WiFi.scanDelete();
+//}
