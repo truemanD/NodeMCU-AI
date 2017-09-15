@@ -1,0 +1,58 @@
+{
+  "name": "[Warning] Home Humidity",
+  "state": "ACTIVE",
+  "weight": 0,
+  "pluginToken": "SmartHome",
+  "filters": [
+    {
+      "configuration": {
+        "messageTypes": [
+          "POST_TELEMETRY"
+        ]
+      },
+      "name": "Message Type Filter",
+      "clazz": "org.thingsboard.server.extensions.core.filter.MsgTypeFilter"
+    },
+    {
+      "configuration": {
+        "filter": "typeof humidity !== 'undefined'"
+      },
+      "clazz": "org.thingsboard.server.extensions.core.filter.DeviceTelemetryFilter",
+      "name": "Device Telemetry Filter"
+    },
+    {
+      "configuration": {
+        "filter": "typeof cs.ThingsBoardToken !== 'undefined' \n&& cs.ThingsBoardToken === 'SmartHome'"
+      },
+      "clazz": "org.thingsboard.server.extensions.core.filter.DeviceAttributesFilter",
+      "name": "Device Attributes Filter"
+    }
+  ],
+  "processor": {
+    "configuration": {
+      "alarmPropagateFlag": true,
+      "alarmDetailsTemplate": "{\"humidity\":\"$humidity.valueAsString\"}",
+      "newAlarmExpression": "humidity <= 30 || humidity >= 60\n\n",
+      "alarmSeverity": "WARNING",
+      "alarmStatus": "ACTIVE_UNACK",
+      "clearAlarmExpression": "humidity > 30 && humidity < 60\n\n",
+      "alarmTypeTemplate": "Alarm"
+    },
+    "clazz": "org.thingsboard.server.extensions.core.processor.AlarmProcessor",
+    "name": "Humidity Alarm"
+  },
+  "action": {
+    "configuration": {
+      "sync": false,
+      "actionPath": "rest/dashboard",
+      "requestMethod": "POST",
+      "template": "{\"humidity\":\"$humidity.valueAsString\"}",
+      "expectedResultCode": 200
+    },
+    "clazz": "org.thingsboard.server.extensions.rest.action.RestApiCallPluginAction",
+    "name": "Warning humidity"
+  },
+  "additionalInfo": {
+    "description": "[Warning] Home Humidity"
+  }
+}
