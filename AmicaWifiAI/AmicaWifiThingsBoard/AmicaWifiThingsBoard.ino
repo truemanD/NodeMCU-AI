@@ -13,6 +13,7 @@
 
 DHT_Unified dht(DHTPIN, DHTTYPE);
 ADC_MODE(ADC_VCC); //vcc read
+uint32_t delayMS;
 int status = WL_IDLE_STATUS;
 int statusAP = WL_IDLE_STATUS;
 String ownSsid = "SmartHome";
@@ -71,7 +72,7 @@ void setup() {
 
   //  create AP
   createAccessPoint();
-
+  loadConfig();
   initSensors();
 }
 
@@ -79,7 +80,6 @@ void loop() {
   status = WiFi.status();
   postModuleAttributes();
   if (status != WL_CONNECTED)  {
-    loadConfig();
     connectToWifi(networkSsid, networkPassword);
   }  else  {
     postSensorsValues();
@@ -111,22 +111,6 @@ void initSensors() {
   dht.temperature().getSensor(&sensor);
   dht.humidity().getSensor(&sensor);
   delayMS = sensor.min_delay / 1000;
-}
-
-void postModuleAttributes() {
-  postAttribute("OwnNetworkSSID", tmpOwnSsid);
-  postAttribute("OwnNetworkPassord", ownPassword);
-  postAttribute("OwnNetworkStatus", String(apUpFlag));
-  postAttribute("OwnIP", "http://" + ownIP + "/");
-  postAttribute("InternetSSID", networkSsid);
-  postAttribute("InternetUser", networkUser);
-  postAttribute("InternetPassword", networkPassword);
-  postAttribute("InternetStatus", String(status));
-  postAttribute("ModuleType", moduleType);
-  postAttribute("ThingsBoardAddress", "http://" + dashAddress + "/");
-  postAttribute("ThingsBoardToken", dashToken);
-  postAttribute("InternetIP", networkIP);
-  isAttributesSet = true;
 }
 
 void createAccessPoint() {
@@ -219,7 +203,8 @@ void startServer() {
   });
   server.on("/action", []() {
     Serial.println("Action POST");
-    server.send(200, "text/html", "PING");
+    postActionAlarm();
+    server.send(200, "text/html", "Action POST");
     delay(1000);
   });
   server.on("/", []() {
@@ -333,6 +318,22 @@ void disconnectFromWifi() {
   Serial.println("Disconnected form wifi");
 }
 
+void postModuleAttributes() {
+  postAttribute("OwnNetworkSSID", tmpOwnSsid);
+  postAttribute("OwnNetworkPassord", ownPassword);
+  postAttribute("OwnNetworkStatus", String(apUpFlag));
+  postAttribute("OwnIP", "http://" + ownIP + "/");
+  postAttribute("InternetSSID", networkSsid);
+  postAttribute("InternetUser", networkUser);
+  postAttribute("InternetPassword", networkPassword);
+  postAttribute("InternetStatus", String(status));
+  postAttribute("ModuleType", moduleType);
+  postAttribute("ThingsBoardAddress", "http://" + dashAddress + "/");
+  postAttribute("ThingsBoardToken", dashToken);
+  postAttribute("InternetIP", networkIP);
+  isAttributesSet = true;
+}
+
 void postSensorsValues() {
   if (status == WL_CONNECTED && moduleType != "ap") {
     delay(delayMS);
@@ -370,6 +371,12 @@ void postSensorsValues() {
     }
     //    delay(2500);
   }
+}
+
+void postActionAlarm() {
+  isAttributesSet = false;
+  postAttribute("Alarm", "activate");
+  isAttributesSet = true;
 }
 
 void postTelemetry(String type, float value) {
