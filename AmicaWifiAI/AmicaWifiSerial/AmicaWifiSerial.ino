@@ -5,22 +5,35 @@
 #include <DHT.h>
 #include <DHT_U.h>
 #include "SoftwareSerial.h"
+#include "pitches.h"
 
 #define DHTPIN            2         // Pin which is connected to the DHT sensor.
 #define PIN_RX  4           //D2
 #define PIN_TX  5           //D1
 #define DHTTYPE           DHT11     // DHT 11 
-
+#define SPEAKER_PIN  0          //D3
 
 DHT_Unified dht(DHTPIN, DHTTYPE);
 ADC_MODE(ADC_VCC); //vcc read
 SoftwareSerial mySerial(PIN_RX, PIN_TX); // RX,TX
 byte cmd[9] = {0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79};
 unsigned char response[9];
+int melody[] = {
+  NOTE_C4, NOTE_G3, NOTE_G3, NOTE_A3, NOTE_G3, NOTE_B0, NOTE_B3, NOTE_C4
+};
+int noteDurations[] = {
+  4, 8, 8, 4, 4, 4, 4, 4
+};
+
+float t_temp = 0;
+float t_ppm = 0;
+float t_humid = 0;
+float t_vdd = 0;
+
 
 void setup() {
   Serial.begin(9600);
-  Serial.println();
+  Serial.println("Hello");
 
   initSensors();
 }
@@ -39,6 +52,11 @@ void initSensors() {
 
 void postSensorsValues() {
   delay(10000);
+  float temp = 0;
+  float ppm = 0;
+  float humid = 0;
+  float vdd = 0;
+
   // Get temperature event and print its value.
   sensors_event_t event;
   dht.temperature().getEvent(&event);
@@ -46,9 +64,7 @@ void postSensorsValues() {
     Serial.println("Error reading temperature!");
   }
   else {
-    Serial.print("Temperature: ");
-    Serial.print(event.temperature);
-    Serial.println(" *C");
+    temp = event.temperature;
   }
 
   // Get humidity event and print its value.
@@ -57,26 +73,35 @@ void postSensorsValues() {
     Serial.println("Error reading humidity!");
   }
   else {
-    Serial.print("Humidity: ");
-    Serial.print(event.relative_humidity);
-    Serial.println("%");
+    humid = event.relative_humidity;
   }
 
   //  Get voltage
   {
-    float vdd = ESP.getVcc();
+    vdd = ESP.getVcc();
     vdd = vdd / 1000;
-    Serial.print("Voltage: ");
-    Serial.print(vdd);
-    Serial.println(" V");
+
   }
-
   //  Get PPM
-  getCO2Data();
+  ppm = getCO2Data();
 
+  Serial.print("Temperature: " + String(temp) + "*C; ");
+  Serial.print("Humidity: " + String(humid) + "%; ");
+  Serial.print("CO2: " + String(ppm) + "PPM; ");
+  Serial.print("Voltage: " + String(vdd) + "V;");
+  Serial.println();
+
+  if ((t_ppm > 1200 & ppm > 1200) | (t_temp > 25 & temp > 25)) {
+    alarm();
+  }
+  t_temp = temp;
+  t_humid = humid;
+  t_vdd = vdd;
+  t_ppm = ppm;
 }
 
-void getCO2Data() {
+int getCO2Data() {
+  int result;
   mySerial.write(cmd, 9);
   memset(response, 0, 9);
   mySerial.readBytes(response, 9);
@@ -92,21 +117,33 @@ void getCO2Data() {
     //Serial.println("CRC error: " + String(crc) + " / " + String(response[8]));
     char raw[32];
     sprintf(raw, "RAW: %02X %02X %02X %02X %02X %02X %02X %02X %02X", response[0], response[1], response[2], response[3], response[4], response[5], response[6], response[7], response[8]);
-    Serial.println(raw);
     Serial.println("CRC error: " + String(crc) + " / " + String(response[8]));
+    result = -1;
   } else {
     unsigned int responseHigh = (unsigned int) response[2];
     unsigned int responseLow = (unsigned int) response[3];
     int ppm = (256 * responseHigh) + responseLow;
-    int temp = response[4] - 20;
-    Serial.println(String("-=-"));
+    //    int temp = response[4] - 20;
     char raw[32];
     sprintf(raw, "RAW: %02X %02X %02X %02X %02X %02X %02X %02X %02X", response[0], response[1], response[2], response[3], response[4], response[5], response[6], response[7], response[8]);
-    Serial.println(raw);
     if (ppm <= 400 || ppm > 4900) {
       Serial.println("CO2: no valid data");
+      result = -2;
     } else {
-      Serial.println("CO2 PPM:" + String(ppm) + "; Temp:" + String(temp));
+      result = ppm;
     }
+  }
+  return result;
+}
+
+
+
+void alarm() {
+  for (int thisNote = 0; thisNote < 8; thisNote++) {
+    int noteDuration = 1000 / noteDurations[thisNote];
+    tone(SPEAKER_PIN, melody[thisNote], noteDuration);
+    int pauseBetweenNotes = noteDuration * 1.30;
+    delay(pauseBetweenNotes);
+    noTone(SPEAKER_PIN);
   }
 }
