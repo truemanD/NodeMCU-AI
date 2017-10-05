@@ -12,6 +12,8 @@
 #define PIN_TX  5           //D1
 #define DHTTYPE           DHT11     // DHT 11 
 #define SPEAKER_PIN  0          //D3
+#define RED_LED 14 //D5
+#define GREED_LED 12 //D6
 
 DHT_Unified dht(DHTPIN, DHTTYPE);
 ADC_MODE(ADC_VCC); //vcc read
@@ -32,9 +34,10 @@ float t_vdd = 0;
 
 
 void setup() {
+  pinMode(RED_LED, OUTPUT);     // Initialize the RED_LED pin as an output
+  pinMode(GREED_LED, OUTPUT);     // Initialize the GREED_LED pin as an output
   Serial.begin(9600);
   Serial.println("Hello");
-
   initSensors();
 }
 
@@ -91,8 +94,10 @@ void postSensorsValues() {
   Serial.print("Voltage: " + String(vdd) + "V;");
   Serial.println();
 
-  if ((t_ppm > 1200 & ppm > 1200) | (t_temp > 25 & temp > 25)) {
+  if ((t_ppm > 1350 & ppm > 1350) | (t_temp > 26 & temp > 26)) {
     alarm();
+  } else {
+    alarmOff();
   }
   t_temp = temp;
   t_humid = humid;
@@ -139,6 +144,7 @@ int getCO2Data() {
 
 
 void alarm() {
+  alarmOn();
   for (int thisNote = 0; thisNote < 8; thisNote++) {
     int noteDuration = 1000 / noteDurations[thisNote];
     tone(SPEAKER_PIN, melody[thisNote], noteDuration);
@@ -146,4 +152,15 @@ void alarm() {
     delay(pauseBetweenNotes);
     noTone(SPEAKER_PIN);
   }
+}
+
+
+void alarmOn() {
+  digitalWrite(GREED_LED, LOW);
+  digitalWrite(RED_LED, HIGH);
+}
+
+void alarmOff() {
+  digitalWrite(RED_LED, LOW);
+  digitalWrite(GREED_LED, HIGH);
 }
