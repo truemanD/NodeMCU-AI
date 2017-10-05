@@ -54,7 +54,7 @@ void initSensors() {
 
 
 void postSensorsValues() {
-  delay(10000);
+  delay(4000);
   float temp = 0;
   float ppm = 0;
   float humid = 0;
@@ -94,11 +94,8 @@ void postSensorsValues() {
   Serial.print("Voltage: " + String(vdd) + "V;");
   Serial.println();
 
-  if ((t_ppm > 1350 & ppm > 1350) | (t_temp > 26 & temp > 26)) {
-    alarm();
-  } else {
-    alarmOff();
-  }
+  checkAlarm(t_ppm, ppm, t_humid, humid, t_temp, temp, t_vdd, vdd);
+
   t_temp = temp;
   t_humid = humid;
   t_vdd = vdd;
@@ -142,9 +139,22 @@ int getCO2Data() {
 }
 
 
+void checkAlarm(float t_ppm, float ppm, float t_humid, float humid, float t_temp, float temp, float t_vdd, float vdd) {
+  if (ppm < 0 || temp == 0 || vdd == 0 || humid == 0) {
+    alarmLedDisable();
+  } else if ((t_ppm > 1350 && ppm > 1350) || (t_temp > 26 && temp > 26)) {
+    masterAlarm();
+  } else {
+    alarmLedOff();
+  }
+}
 
-void alarm() {
-  alarmOn();
+void masterAlarm() {
+  alarmLedOn();
+  alarmSpeaker();
+}
+
+void alarmSpeaker() {
   for (int thisNote = 0; thisNote < 8; thisNote++) {
     int noteDuration = 1000 / noteDurations[thisNote];
     tone(SPEAKER_PIN, melody[thisNote], noteDuration);
@@ -154,13 +164,17 @@ void alarm() {
   }
 }
 
-
-void alarmOn() {
+void alarmLedOn() {
   digitalWrite(GREED_LED, LOW);
   digitalWrite(RED_LED, HIGH);
 }
 
-void alarmOff() {
+void alarmLedOff() {
   digitalWrite(RED_LED, LOW);
   digitalWrite(GREED_LED, HIGH);
+}
+
+void alarmLedDisable() {
+  digitalWrite(RED_LED, LOW);
+  digitalWrite(GREED_LED, LOW);
 }
