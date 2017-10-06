@@ -54,7 +54,7 @@ void initSensors() {
 
 
 void postSensorsValues() {
-  delay(4000);
+  delay(3000);
   float temp = 0;
   float ppm = 0;
   float humid = 0;
