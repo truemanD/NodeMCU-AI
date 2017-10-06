@@ -31,6 +31,7 @@ float t_temp = 0;
 float t_ppm = 0;
 float t_humid = 0;
 float t_vdd = 0;
+int delayInterval = 3000;
 
 
 void setup() {
@@ -54,7 +55,7 @@ void initSensors() {
 
 
 void postSensorsValues() {
-  delay(3000);
+  delay(delayInterval);
   float temp = 0;
   float ppm = 0;
   float humid = 0;
@@ -165,11 +166,13 @@ void alarmSpeaker() {
 }
 
 void alarmLedOn() {
+  delayInterval = 3000;
   digitalWrite(GREED_LED, LOW);
   digitalWrite(RED_LED, HIGH);
 }
 
 void alarmLedOff() {
+  delayInterval = 3000;
   digitalWrite(RED_LED, LOW);
   digitalWrite(GREED_LED, HIGH);
 }
@@ -177,4 +180,5 @@ void alarmLedOff() {
 void alarmLedDisable() {
   digitalWrite(RED_LED, LOW);
   digitalWrite(GREED_LED, LOW);
+  delayInterval = delayInterval + 1000;
 }
