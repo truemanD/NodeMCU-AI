@@ -1,9 +1,7 @@
+#include <SoftwareSerial.h>
 #include <Adafruit_Sensor.h>
 #include <DHT.h>
 #include <DHT_U.h>
-#define DHTPIN            2         // Pin which is connected to the DHT sensor.
-#define DHTTYPE           DHT11     // DHT 11 
-
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
@@ -11,8 +9,16 @@
 #include <ArduinoJson.h>
 #include "FS.h"
 
+#define DHTPIN            2         // Pin which is connected to the DHT sensor.
+#define DHTTYPE           DHT11     // DHT 11 
+#define PIN_RX  4           //D2
+#define PIN_TX  5           //D1
+
 DHT_Unified dht(DHTPIN, DHTTYPE);
 ADC_MODE(ADC_VCC); //vcc read
+SoftwareSerial mySerial(PIN_RX, PIN_TX); // RX,TX
+byte cmd[9] = {0xFF, 0x01, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x79};
+unsigned char response[9];
 uint32_t delayMS;
 int status = WL_IDLE_STATUS;
 int statusAP = WL_IDLE_STATUS;
@@ -33,9 +39,15 @@ int netExceptionCounter = 0;
 int netConnectExceptionCounter = 0;
 boolean isAttributesSet = false;
 boolean isSavedParams = false;
+float t_temp = 0;
+float t_ppm = 0;
+float t_humid = 0;
+float t_vdd = 0;
+int delayInterval = 3000;
 
 ESP8266WebServer server(80);
 String webPage = "";
+
 
 //void setup() {
 //  Serial.begin(9600);
@@ -336,42 +348,92 @@ void postModuleAttributes() {
 
 void postSensorsValues() {
   if (status == WL_CONNECTED && moduleType != "ap") {
-    delay(delayMS);
-    // Get temperature event and print its value.
+    delay(delayInterval);
+    int temp = 0;
+    int ppm = 0;
+    int humid = 0;
+    float vdd = 0;
+    // Temperature
     sensors_event_t event;
     dht.temperature().getEvent(&event);
     if (isnan(event.temperature)) {
       Serial.println("Error reading temperature!");
     }
     else {
-      Serial.print("Temperature: ");
-      Serial.print(event.temperature);
-      Serial.println(" *C");
+      temp = event.temperature;
       postTelemetry("temperature", event.temperature);
     }
-    // Get humidity event and print its value.
+
+    // Humidity
     dht.humidity().getEvent(&event);
     if (isnan(event.relative_humidity)) {
       Serial.println("Error reading humidity!");
     }
     else {
-      Serial.print("Humidity: ");
-      Serial.print(event.relative_humidity);
-      Serial.println("%");
+      humid = event.relative_humidity;
       postTelemetry("humidity", event.relative_humidity);
     }
+
     //  Get voltage
     {
-      float vdd = ESP.getVcc();
+      vdd = ESP.getVcc();
       vdd = vdd / 1000;
-      Serial.print("Voltage: ");
-      Serial.print(vdd);
-      Serial.println(" V");
       postTelemetry("voltage", vdd);
     }
-    //    delay(2500);
+
+    //  Get PPM
+    {
+      ppm = getCO2Data();
+      postTelemetry("CO2", ppm);
+    }
+    Serial.print("Temperature: " + String(temp) + "*C; ");
+    Serial.print("Humidity: " + String(humid) + "%; ");
+    Serial.print("CO2: " + String(ppm) + "PPM; ");
+    Serial.print("Voltage: " + String(vdd) + "V;");
+    Serial.println();
+    t_temp = temp;
+    t_humid = humid;
+    t_vdd = vdd;
+    t_ppm = ppm;
   }
 }
+
+int getCO2Data() {
+  int result;
+  mySerial.write(cmd, 9);
+  memset(response, 0, 9);
+  mySerial.readBytes(response, 9);
+
+  // CRC check
+  int i;
+  byte crc = 0;
+  for (i = 1; i < 8; i++) crc += response[i];
+  crc = 255 - crc;
+  crc++;
+  // End of CRC check
+  if ( !(response[0] == 0xFF && response[1] == 0x86 && response[8] == crc) ) {
+    //Serial.println("CRC error: " + String(crc) + " / " + String(response[8]));
+    char raw[32];
+    sprintf(raw, "RAW: %02X %02X %02X %02X %02X %02X %02X %02X %02X", response[0], response[1], response[2], response[3], response[4], response[5], response[6], response[7], response[8]);
+    Serial.println("CRC error: " + String(crc) + " / " + String(response[8]));
+    result = -1;
+  } else {
+    unsigned int responseHigh = (unsigned int) response[2];
+    unsigned int responseLow = (unsigned int) response[3];
+    int ppm = (256 * responseHigh) + responseLow;
+    //    int temp = response[4] - 20;
+    char raw[32];
+    sprintf(raw, "RAW: %02X %02X %02X %02X %02X %02X %02X %02X %02X", response[0], response[1], response[2], response[3], response[4], response[5], response[6], response[7], response[8]);
+    if (ppm <= 400 || ppm > 4900) {
+      Serial.println("CO2: no valid data");
+      result = -2;
+    } else {
+      result = ppm;
+    }
+  }
+  return result;
+}
+
 
 void postActionAlarm() {
   isAttributesSet = false;
@@ -380,6 +442,10 @@ void postActionAlarm() {
 }
 
 void postTelemetry(String type, float value) {
+  postTelemetry(type, String(value));
+}
+
+void postTelemetry(String type, int value) {
   postTelemetry(type, String(value));
 }
 
@@ -445,7 +511,6 @@ void sendPost(String message, String serverPoint) {
         netExceptionCounter = 0;
         if (isSavedParams == false) {
           saveConfig();
-          isSavedParams = true;
         }
         status = WiFi.status();
       }
@@ -488,6 +553,7 @@ boolean saveConfig() {
   String value = prepareConfig();
   Serial.println("Save config");
   Serial.println(value);
+  isSavedParams = true;
   return fileWrite("/config.json", value);
 }
 
