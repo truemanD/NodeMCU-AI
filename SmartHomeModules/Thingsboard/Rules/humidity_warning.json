@@ -1,0 +1,42 @@
+{
+  "name": "Humidity warning",
+  "state": "SUSPENDED",
+  "weight": 0,
+  "pluginToken": "SH(relay)150",
+  "filters": [
+    {
+      "configuration": {
+        "filter": "typeof humidity !== 'undefined'"
+      },
+      "clazz": "org.thingsboard.server.extensions.core.filter.DeviceTelemetryFilter",
+      "name": "Telemetry Filter"
+    }
+  ],
+  "processor": {
+    "configuration": {
+      "alarmPropagateFlag": true,
+      "alarmDetailsTemplate": "{\"humidity\":$humidity}",
+      "alarmSeverity": "WARNING",
+      "alarmStatus": "ACTIVE_ACK",
+      "alarmTypeTemplate": "warning",
+      "clearAlarmExpression": "humidity >= 40 && humidity <= 60 ",
+      "newAlarmExpression": "humidity < 40 || humidity > 60"
+    },
+    "clazz": "org.thingsboard.server.extensions.core.processor.AlarmProcessor",
+    "name": "Humidity warning"
+  },
+  "action": {
+    "configuration": {
+      "sync": true,
+      "actionPath": "/activate",
+      "requestMethod": "POST",
+      "expectedResultCode": 200,
+      "template": "{\"humidity\":$humidity}"
+    },
+    "clazz": "org.thingsboard.server.extensions.rest.action.RestApiCallPluginAction",
+    "name": "ActivateRelay"
+  },
+  "additionalInfo": {
+    "description": "Humidity warning"
+  }
+}

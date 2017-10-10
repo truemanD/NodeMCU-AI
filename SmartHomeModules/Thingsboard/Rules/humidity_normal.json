@@ -1,0 +1,42 @@
+{
+  "name": "Humidity normal",
+  "state": "SUSPENDED",
+  "weight": 0,
+  "pluginToken": "SH(relay)150",
+  "filters": [
+    {
+      "configuration": {
+        "filter": "typeof humidity !== 'undefined'"
+      },
+      "clazz": "org.thingsboard.server.extensions.core.filter.DeviceTelemetryFilter",
+      "name": "Telemetry Filter"
+    }
+  ],
+  "processor": {
+    "configuration": {
+      "alarmPropagateFlag": true,
+      "alarmDetailsTemplate": "{\"humidity\":$humidity}",
+      "newAlarmExpression": "humidity >= 40 && humidity <= 60 ",
+      "clearAlarmExpression": "humidity < 40 || humidity > 60",
+      "alarmSeverity": "INDETERMINATE",
+      "alarmStatus": "CLEARED_ACK",
+      "alarmTypeTemplate": "info"
+    },
+    "clazz": "org.thingsboard.server.extensions.core.processor.AlarmProcessor",
+    "name": "Humidity info"
+  },
+  "action": {
+    "configuration": {
+      "sync": false,
+      "actionPath": "/deactivate",
+      "template": "{\"humidity\":$humidity}",
+      "requestMethod": "POST",
+      "expectedResultCode": 200
+    },
+    "clazz": "org.thingsboard.server.extensions.rest.action.RestApiCallPluginAction",
+    "name": "DeactivateRelay"
+  },
+  "additionalInfo": {
+    "description": "Humidity normal"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "name": "CO2 warning",
+  "state": "SUSPENDED",
+  "weight": 0,
+  "pluginToken": null,
+  "filters": [
+    {
+      "configuration": {
+        "filter": "typeof CO2 !== 'undefined'"
+      },
+      "clazz": "org.thingsboard.server.extensions.core.filter.DeviceTelemetryFilter",
+      "name": "Telemetry Filter"
+    }
+  ],
+  "processor": {
+    "configuration": {
+      "alarmPropagateFlag": true,
+      "alarmDetailsTemplate": "{\"CO2\":$CO2}",
+      "newAlarmExpression": "CO2 < 410 || CO2 > 1100",
+      "clearAlarmExpression": "CO2 >= 410 && CO2 <= 1100",
+      "alarmSeverity": "WARNING",
+      "alarmStatus": "ACTIVE_ACK",
+      "alarmTypeTemplate": "warning"
+    },
+    "clazz": "org.thingsboard.server.extensions.core.processor.AlarmProcessor",
+    "name": "CO2 warning"
+  },
+  "action": null,
+  "additionalInfo": {
+    "description": "CO2 warning"
+  }
+}

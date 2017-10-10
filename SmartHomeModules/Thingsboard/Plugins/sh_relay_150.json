@@ -3,7 +3,7 @@
   "name": "SH(relay)150",
   "clazz": "org.thingsboard.server.extensions.rest.plugin.RestApiCallPlugin",
   "publicAccess": false,
-  "state": "ACTIVE",
+  "state": "SUSPENDED",
   "configuration": {
     "port": 80,
     "basePath": "/",
