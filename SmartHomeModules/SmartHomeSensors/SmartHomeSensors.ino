@@ -94,6 +94,7 @@ void loop() {
   if (status != WL_CONNECTED)  {
     connectToWifi(networkSsid, networkPassword);
   }  else  {
+    setStatus();
     postSensorsValues();
   }
   if (statusAP == 0 && apUpFlag == true) {
@@ -231,7 +232,7 @@ void startServer() {
     configureWebPage();
     server.send(200, "text/html", webPage);
     delay(1000);
-  });  
+  });
   server.on("/load_config", []() {
     Serial.println("loadConfig");
     loadConfig();
@@ -488,6 +489,12 @@ void ActivateAlarm() {
 void DeactivateAlarm() {
   isAttributesSet = false;
   postAttribute("AlarmStatus", "deactivated");
+  isAttributesSet = true;
+}
+
+void setStatus() {
+  isAttributesSet = false;
+  postAttribute("Status", "active");
   isAttributesSet = true;
 }
 

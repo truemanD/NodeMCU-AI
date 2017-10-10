@@ -1,6 +1,6 @@
 {
   "name": "Temperature warning",
-  "state": "ACTIVE",
+  "state": "SUSPENDED",
   "weight": 0,
   "pluginToken": null,
   "filters": [
@@ -15,11 +15,11 @@
   "processor": {
     "configuration": {
       "alarmPropagateFlag": true,
-      "alarmDetailsTemplate": "{\"sensor exception\":\"temperature < 22 || temperature > 25\"}",
+      "alarmDetailsTemplate": "{\"temperature\":$temperature}",
       "newAlarmExpression": "temperature < 22 || temperature > 25",
       "alarmSeverity": "WARNING",
-      "alarmStatus": "ACTIVE_UNACK",
-      "alarmTypeTemplate": "temp",
+      "alarmStatus": "ACTIVE_ACK",
+      "alarmTypeTemplate": "warning",
       "clearAlarmExpression": "temperature >= 22 && temperature <= 25 "
     },
     "clazz": "org.thingsboard.server.extensions.core.processor.AlarmProcessor",

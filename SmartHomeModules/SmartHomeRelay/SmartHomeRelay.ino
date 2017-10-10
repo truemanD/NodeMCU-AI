@@ -55,6 +55,8 @@ void loop() {
   postModuleAttributes();
   if (status != WL_CONNECTED)  {
     connectToWifi(networkSsid, networkPassword);
+  } else {
+    setStatus();
   }
   if (statusAP == 0 && apUpFlag == true) {
     createAccessPoint();
@@ -353,6 +355,12 @@ void DeactivateAlarm() {
   digitalWrite(RELAYPIN, LOW);
   isAttributesSet = false;
   postAttribute("AlarmStatus", "deactivated");
+  isAttributesSet = true;
+}
+
+void setStatus() {
+  isAttributesSet = false;
+  postAttribute("Status", "active");
   isAttributesSet = true;
 }
 
