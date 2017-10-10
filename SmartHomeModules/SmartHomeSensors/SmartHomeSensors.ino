@@ -93,7 +93,7 @@ void loop() {
   postModuleAttributes();
   if (status != WL_CONNECTED)  {
     connectToWifi(networkSsid, networkPassword);
-  }  else  {
+  }  else if (status == WL_CONNECTED)  {
     setStatus();
     postSensorsValues();
   }
@@ -226,6 +226,11 @@ void startServer() {
     server.send(200, "text/html", webPage);
     delay(1000);
   });
+  server.on("/restart", []() {
+    ESP.restart();
+    server.send(200, "text/html", "ESP restarted");
+    delay(1000);
+  });
   server.on("/save_config", []() {
     Serial.println("saveConfig");
     saveConfig();
@@ -284,6 +289,7 @@ void startServer() {
     }
     if (tmpNetworkIP.length() != 0) {
       networkIP = tmpNetworkIP;
+      connectToWifi(networkSsid, networkPassword);
     }
     if (tmpDashToken.length() != 0 && tmpDashToken != "SmartHome") {
       dashToken = tmpDashToken;
@@ -575,6 +581,7 @@ void sendPost(String message, String serverPoint) {
       Serial.printf("[HTTP] POST... failed, error: % s\n", http.errorToString(httpCode).c_str());
       netExceptionCounter = netExceptionCounter + 1 ;
       status = WiFi.status();
+      isSavedParams = false;
     }
     delay(200);
     http.end();
@@ -582,6 +589,7 @@ void sendPost(String message, String serverPoint) {
     Serial.println("Address exception counter exceed limit. Check address and token. Sleep for 1 minute.");
     netExceptionCounter = 0;
     delay(60000);
+    isSavedParams = false;
     //    dashAddress = "";
     //    dashToken = ownSsid;
     //    ESP.restart();
@@ -654,6 +662,8 @@ String loadConfig() {
   networkUser = CnetworkUser;
   const char * CnetworkPassword = parsed["InternetPassword"];
   networkPassword = CnetworkPassword;
+  const char * CnetworkIP = parsed["InternetIP"];
+  networkIP = CnetworkIP;
   const char * CmoduleType = parsed["ModuleType"];
   moduleType = CmoduleType;
   const char * CdashAddress = parsed["ThingsBoardAddress"];
@@ -673,10 +683,10 @@ String prepareConfig() {
   result = result + "\",\"InternetSSID\":\"" + networkSsid;
   result = result + "\",\"InternetUser\":\"" + networkUser;
   result = result + "\",\"InternetPassword\":\"" + networkPassword;
+  result = result + "\",\"InternetIP\":\"" + networkIP;
   result = result + "\",\"ModuleType\":\"" + moduleType;
   result = result + "\",\"ThingsBoardAddress\":\"" + dashAddress ;
   result = result + "\",\"ThingsBoardToken\":\"" + dashToken;
-  result = result + "\",\"InternetIP\":\"" + networkIP;
   result = result + "\"}";
   return result;
 }

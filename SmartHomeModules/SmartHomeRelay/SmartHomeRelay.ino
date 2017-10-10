@@ -27,6 +27,7 @@ int netExceptionCounter = 0;
 int netConnectExceptionCounter = 0;
 boolean isAttributesSet = false;
 boolean isSavedParams = false;
+boolean isActivated = false;
 
 ESP8266WebServer server(80);
 String webPage = "";
@@ -55,7 +56,7 @@ void loop() {
   postModuleAttributes();
   if (status != WL_CONNECTED)  {
     connectToWifi(networkSsid, networkPassword);
-  } else {
+  } else if (status == WL_CONNECTED) {
     setStatus();
   }
   if (statusAP == 0 && apUpFlag == true) {
@@ -178,6 +179,11 @@ void startServer() {
     server.send(200, "text/html", webPage);
     delay(1000);
   });
+  server.on("/restart", []() {
+    ESP.restart();
+    server.send(200, "text/html", "ESP restarted");
+    delay(1000);
+  });
   server.on("/save_config", []() {
     Serial.println("saveConfig");
     saveConfig();
@@ -236,6 +242,7 @@ void startServer() {
     }
     if (tmpNetworkIP.length() != 0) {
       networkIP = tmpNetworkIP;
+      connectToWifi(networkSsid, networkPassword);
     }
     if (tmpDashToken.length() != 0 && tmpDashToken != "SmartHome") {
       dashToken = tmpDashToken;
@@ -345,17 +352,23 @@ void postModuleAttributes() {
 }
 
 void ActivateAlarm() {
-  digitalWrite(RELAYPIN, HIGH);
-  isAttributesSet = false;
-  postAttribute("AlarmStatus", "activated");
-  isAttributesSet = true;
+  if (isActivated == false) {
+    digitalWrite(RELAYPIN, HIGH);
+    isAttributesSet = false;
+    postAttribute("AlarmStatus", "activated");
+    isAttributesSet = true;
+  }
+  isActivated = true;
 }
 
 void DeactivateAlarm() {
-  digitalWrite(RELAYPIN, LOW);
-  isAttributesSet = false;
-  postAttribute("AlarmStatus", "deactivated");
-  isAttributesSet = true;
+  if (isActivated == true) {
+    digitalWrite(RELAYPIN, LOW);
+    isAttributesSet = false;
+    postAttribute("AlarmStatus", "deactivated");
+    isAttributesSet = true;
+  }
+  isActivated = false;
 }
 
 void setStatus() {
@@ -408,6 +421,7 @@ void sendPost(String message, String serverPoint) {
       Serial.printf("[HTTP] POST... failed, error: % s\n", http.errorToString(httpCode).c_str());
       netExceptionCounter = netExceptionCounter + 1 ;
       status = WiFi.status();
+      isSavedParams = false;
     }
     delay(200);
     http.end();
@@ -415,6 +429,7 @@ void sendPost(String message, String serverPoint) {
     Serial.println("Address exception counter exceed limit. Check address and token. Sleep for 1 minute.");
     netExceptionCounter = 0;
     delay(60000);
+    isSavedParams = false;
     //    dashAddress = "";
     //    dashToken = ownSsid;
     //    ESP.restart();
