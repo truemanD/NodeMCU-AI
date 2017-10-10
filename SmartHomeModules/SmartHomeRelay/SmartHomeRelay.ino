@@ -5,7 +5,7 @@
 #include <ArduinoJson.h>
 #include "FS.h"
 
-#define RELEPIN            2
+#define RELAYPIN            2
 
 
 int status = WL_IDLE_STATUS;
@@ -34,7 +34,7 @@ String webPage = "";
 void setup() {
   Serial.begin(9600);
   Serial.println();
-  pinMode(RELEPIN, OUTPUT);
+  pinMode(RELAYPIN, OUTPUT);
 
   tmpOwnSsid = ownSsid;
   Serial.setDebugOutput(true);
@@ -52,17 +52,17 @@ void setup() {
 
 void loop() {
   status = WiFi.status();
-  //  postModuleAttributes();
+  postModuleAttributes();
   if (status != WL_CONNECTED)  {
     connectToWifi(networkSsid, networkPassword);
   }
   if (statusAP == 0 && apUpFlag == true) {
     createAccessPoint();
-    //    postModuleAttributes();
+    postModuleAttributes();
   }
   if (statusAP == 1 && apUpFlag == false) {
     disableAccessPoint();
-    //    postModuleAttributes();
+    postModuleAttributes();
   }
   server.handleClient();
 }
@@ -75,6 +75,20 @@ void initDefNetwork() {
   moduleType = "tempHumid"; //default Type
   dashAddress = "171.25.167.194:8082"; //default Address
   dashToken = "SmartHome"; //default Token
+}
+
+void resetSettings() {
+  ownSsid = "SmartHome";
+  tmpOwnSsid = "";
+  ownPassword = "SmartHome";
+  ownIP = "";
+  networkSsid = "";
+  networkUser = "";
+  networkPassword = "";
+  networkIP = "";
+  moduleType = "ap";
+  dashAddress = "";
+  dashToken = "SmartHome";
 }
 
 void createAccessPoint() {
@@ -120,11 +134,11 @@ void configureWebPage() {
   webPage += "\"> password<BR></p>\n"
              "            <p><INPUT type=\"text\" name=\"ip\" required value=\"";
   webPage = webPage + networkIP;
-  webPage += "\"> password<BR></p>\n"
+  webPage += "\"> ip<BR></p>\n"
              "            Module params:<br>\n<p>Module type: ";
   webPage = webPage + moduleType;
   webPage += "</p>\n"
-             "            <p><input type=\"radio\" name=\"module\" value=\"rele\" required>rele<Br>\n"
+             "            <p><input type=\"radio\" name=\"module\" value=\"relay\" required>relay<Br>\n"
              "                <input type=\"radio\" name=\"module\" value=\"ap\">access point</p>\n"
              "            <p> <INPUT type=\"text\" name=\"server\" value=\"";
   webPage = webPage + dashAddress;
@@ -154,13 +168,22 @@ void startServer() {
     server.send(200, "text/html", webPage);
     delay(1000);
   });
+  server.on("/reset", []() {
+    Serial.println("Settings reset");
+    resetSettings();
+    saveConfig();
+    configureWebPage();
+    server.send(200, "text/html", webPage);
+    delay(1000);
+  });
   server.on("/save_config", []() {
     Serial.println("saveConfig");
     saveConfig();
     configureWebPage();
     server.send(200, "text/html", webPage);
     delay(1000);
-  });  server.on("/load_config", []() {
+  });
+  server.on("/load_config", []() {
     Serial.println("loadConfig");
     loadConfig();
     configureWebPage();
@@ -169,8 +192,20 @@ void startServer() {
   });
   server.on("/action", []() {
     Serial.println("Action POST");
-    postActionAlarm();
+    ActivateAlarm();
     server.send(200, "text/html", "Action POST");
+    delay(1000);
+  });
+  server.on("/activate", []() {
+    Serial.println("Relay activated");
+    ActivateAlarm();
+    server.send(200, "text/html", "Relay activated");
+    delay(1000);
+  });
+  server.on("/deactivate", []() {
+    Serial.println("Relay deactivated");
+    DeactivateAlarm();
+    server.send(200, "text/html", "Relay deactivated");
     delay(1000);
   });
   server.on("/", []() {
@@ -200,6 +235,11 @@ void startServer() {
     if (tmpNetworkIP.length() != 0) {
       networkIP = tmpNetworkIP;
     }
+    if (tmpDashToken.length() != 0 && tmpDashToken != "SmartHome") {
+      dashToken = tmpDashToken;
+    } else {
+      dashToken = ownSsid;
+    }
     if (tmpModuleType.length() != 0) {
       if (tmpModuleType != moduleType) {
         moduleType = tmpModuleType;
@@ -210,11 +250,6 @@ void startServer() {
           dashAddress = tmpDashAddress;
         }
       }
-    }
-    if (tmpDashToken.length() != 0 && tmpDashToken != "SmartHome") {
-      dashToken = tmpDashToken;
-    } else {
-      dashToken = ownSsid;
     }
     if (tmpDashAddress.length() != 0) {
       dashAddress = tmpDashAddress;
@@ -291,94 +326,95 @@ void disconnectFromWifi() {
   Serial.println("Disconnected form wifi");
 }
 
-//void postModuleAttributes() {
-//  postAttribute("OwnNetworkSSID", tmpOwnSsid);
-//  postAttribute("OwnNetworkPassord", ownPassword);
-//  postAttribute("OwnNetworkStatus", String(apUpFlag));
-//  postAttribute("OwnIP", "http://" + ownIP + "/");
-//  postAttribute("InternetSSID", networkSsid);
-//  postAttribute("InternetUser", networkUser);
-//  postAttribute("InternetPassword", networkPassword);
-//  postAttribute("InternetStatus", String(status));
-//  postAttribute("ModuleType", moduleType);
-//  postAttribute("ThingsBoardAddress", "http://" + dashAddress + "/");
-//  postAttribute("ThingsBoardToken", dashToken);
-//  postAttribute("InternetIP", networkIP);
-//  isAttributesSet = true;
-//}
-
-void postActionAlarm() {
-
-  digitalWrite(RELEPIN, HIGH);   // turn the LED on (HIGH is the voltage level)
-  delay(5000);                       // wait for a second
-  digitalWrite(RELEPIN, LOW);    // turn the LED off by making the voltage LOW
-  delay(5000);
-  //  isAttributesSet = false;
-  //  postAttribute("Alarm", "activate");
-  //  isAttributesSet = true;
+void postModuleAttributes() {
+  postAttribute("OwnNetworkSSID", tmpOwnSsid);
+  postAttribute("OwnNetworkPassord", ownPassword);
+  postAttribute("OwnNetworkStatus", String(apUpFlag));
+  postAttribute("OwnIP", "http://" + ownIP + "/");
+  postAttribute("InternetSSID", networkSsid);
+  postAttribute("InternetUser", networkUser);
+  postAttribute("InternetPassword", networkPassword);
+  postAttribute("InternetIP", networkIP);
+  postAttribute("InternetStatus", String(status));
+  postAttribute("ModuleType", moduleType);
+  postAttribute("ThingsBoardAddress", "http://" + dashAddress + "/");
+  postAttribute("ThingsBoardToken", getTokenValue());
+  isAttributesSet = true;
 }
 
+void ActivateAlarm() {
+  digitalWrite(RELAYPIN, HIGH);
+  isAttributesSet = false;
+  postAttribute("AlarmStatus", "activated");
+  isAttributesSet = true;
+}
 
+void DeactivateAlarm() {
+  digitalWrite(RELAYPIN, LOW);
+  isAttributesSet = false;
+  postAttribute("AlarmStatus", "deactivated");
+  isAttributesSet = true;
+}
 
-//void postAttribute(String type, String value) {
-//  if (status == WL_CONNECTED && isAttributesSet == false && netExceptionCounter < 3) {
-//    String serverPoint;
-//    if (dashAddress.length() != 0) {
-//      serverPoint = "http://" + dashAddress + "/api/v1/";
-//    }
-//    if (dashToken.length() != 0) {
-//      serverPoint = serverPoint + getTokenValue() + "/attributes";
-//    }
-//    if (serverPoint.length() != 0) {
-//      String message = "{\n \"";
-//      message = message + type;
-//      message = message +  "\":\"";
-//      message = message + value;
-//      message = message +  "\"\n}";
-//      Serial.println("Server: " + serverPoint + "; \nMessage: " + message);
-//      sendPost(message, serverPoint);
-//    } else {
-//      Serial.println("Need to set server and module type via SSID: " + tmpOwnSsid);
-//    }
-//  }
-//}
+void postAttribute(String type, String value) {
+  if (status == WL_CONNECTED && isAttributesSet == false && netExceptionCounter < 3) {
+    String serverPoint;
+    if (dashAddress.length() != 0) {
+      serverPoint = "http://" + dashAddress + "/api/v1/";
+    }
+    if (dashToken.length() != 0) {
+      serverPoint = serverPoint + getTokenValue() + "/attributes";
+    }
+    if (serverPoint.length() != 0) {
+      String message = "{\n \"";
+      message = message + type;
+      message = message +  "\":\"";
+      message = message + value;
+      message = message +  "\"\n}";
+      Serial.println("Server: " + serverPoint + "; \nMessage: " + message);
+      sendPost(message, serverPoint);
+    } else {
+      Serial.println("Need to set server and module type via SSID: " + tmpOwnSsid);
+    }
+  }
+}
 
-//void sendPost(String message, String serverPoint) {
-//  if (netExceptionCounter < 20) {
-//    HTTPClient http;
-//    http.begin(serverPoint);
-//    http.addHeader("Content-Type", "application/json");
-//    int httpCode = http.POST(message);
-//    if (httpCode > 0) {
-//      Serial.printf("[HTTP] POST... code: % d\n", httpCode);
-//      if (httpCode == HTTP_CODE_OK) {
-//        String payload = http.getString();
-//        Serial.println(payload);
-//        netExceptionCounter = 0;
-//        if (isSavedParams == false) {
-//          saveConfig();
-//        }
-//        status = WiFi.status();
-//      }
-//    } else {
-//      Serial.printf("[HTTP] POST... failed, error: % s\n", http.errorToString(httpCode).c_str());
-//      netExceptionCounter = netExceptionCounter + 1 ;
-//      status = WiFi.status();
-//    }
-//    delay(200);
-//    http.end();
-//  } else {
-//    Serial.println("Address exception counter exceed limit. Check address and token. Sleep for 1 minute.");
-//    netExceptionCounter = 0;
-//    delay(60000);
-//    //    dashAddress = "";
-//    //    dashToken = ownSsid;
-//    //    ESP.restart();
-//  }
-//}
+void sendPost(String message, String serverPoint) {
+  if (netExceptionCounter < 20) {
+    HTTPClient http;
+    http.begin(serverPoint);
+    http.addHeader("Content-Type", "application/json");
+    int httpCode = http.POST(message);
+    if (httpCode > 0) {
+      Serial.printf("[HTTP] POST... code: % d\n", httpCode);
+      if (httpCode == HTTP_CODE_OK) {
+        String payload = http.getString();
+        Serial.println(payload);
+        netExceptionCounter = 0;
+        if (isSavedParams == false) {
+          saveConfig();
+        }
+        status = WiFi.status();
+      }
+    } else {
+      Serial.printf("[HTTP] POST... failed, error: % s\n", http.errorToString(httpCode).c_str());
+      netExceptionCounter = netExceptionCounter + 1 ;
+      status = WiFi.status();
+    }
+    delay(200);
+    http.end();
+  } else {
+    Serial.println("Address exception counter exceed limit. Check address and token. Sleep for 1 minute.");
+    netExceptionCounter = 0;
+    delay(60000);
+    //    dashAddress = "";
+    //    dashToken = ownSsid;
+    //    ESP.restart();
+  }
+}
 
 String getTokenValue() {
-  Serial.print(" -> ");
+  Serial.print("token -> ");
   String value;
   if (moduleType.length() != 0 && moduleType != "ap") {
     value = "SH(" + moduleType + ")";

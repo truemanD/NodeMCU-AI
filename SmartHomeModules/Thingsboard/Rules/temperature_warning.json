@@ -1,40 +1,32 @@
 {
-  "name": "Temp warning",
+  "name": "Temperature warning",
   "state": "ACTIVE",
   "weight": 0,
-  "pluginToken": "SH_controller",
+  "pluginToken": null,
   "filters": [
     {
       "configuration": {
         "filter": "typeof temperature !== 'undefined'"
       },
       "clazz": "org.thingsboard.server.extensions.core.filter.DeviceTelemetryFilter",
-      "name": "tel"
+      "name": "Telemetry Filter"
     }
   ],
   "processor": {
     "configuration": {
       "alarmPropagateFlag": true,
-      "alarmDetailsTemplate": "{\"sensor exception\":}",
+      "alarmDetailsTemplate": "{\"sensor exception\":\"temperature < 22 || temperature > 25\"}",
       "newAlarmExpression": "temperature < 22 || temperature > 25",
-      "alarmSeverity": "MINOR",
+      "alarmSeverity": "WARNING",
       "alarmStatus": "ACTIVE_UNACK",
       "alarmTypeTemplate": "temp",
       "clearAlarmExpression": "temperature >= 22 && temperature <= 25 "
     },
     "clazz": "org.thingsboard.server.extensions.core.processor.AlarmProcessor",
-    "name": "temp"
+    "name": "Temperature warning"
   },
-  "action": {
-    "configuration": {
-      "sync": true,
-      "actionPath": "action",
-      "requestMethod": "POST",
-      "expectedResultCode": 200,
-      "template": "test"
-    },
-    "clazz": "org.thingsboard.server.extensions.rest.action.RestApiCallPluginAction",
-    "name": "test"
-  },
-  "additionalInfo": null
+  "action": null,
+  "additionalInfo": {
+    "description": "Temperature warning"
+  }
 }

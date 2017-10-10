@@ -112,9 +112,23 @@ void loop() {
 void initDefNetwork() {
   networkSsid = "HOME"; //default SSID
   networkPassword = "ARjOwI23"; //default password
-  moduleType = "tempHumid"; //default Type
+  moduleType = "sensors"; //default Type
   dashAddress = "171.25.167.194:8082"; //default Address
   dashToken = "SmartHome"; //default Token
+}
+
+void resetSettings() {
+  ownSsid = "SmartHome";
+  tmpOwnSsid = "";
+  ownPassword = "SmartHome";
+  ownIP = "";
+  networkSsid = "";
+  networkUser = "";
+  networkPassword = "";
+  networkIP = "";
+  moduleType = "ap";
+  dashAddress = "";
+  dashToken = "SmartHome";
 }
 
 void initSensors() {
@@ -166,11 +180,14 @@ void configureWebPage() {
              "            <p><INPUT type=\"text\" name=\"password\" required value=\"";
   webPage = webPage + networkPassword;
   webPage += "\"> password<BR></p>\n"
+             "            <p><INPUT type=\"text\" name=\"ip\" required value=\"";
+  webPage = webPage + networkIP;
+  webPage += "\"> ip<BR></p>\n"
              "            Module params:<br>\n<p>Module type: ";
   webPage = webPage + moduleType;
   webPage += "</p>\n"
-             "            <p><input type=\"radio\" name=\"module\" value=\"tempHumid\" required>tempHumid<Br>\n"
-             "                <input type=\"radio\" name=\"module\" value=\"motion\">motion<Br>\n"
+             "            <p><input type=\"radio\" name=\"module\" value=\"sensors\" required>sensors<Br>\n"
+             //             "                <input type=\"radio\" name=\"module\" value=\"motion\">motion<Br>\n"
              "                <input type=\"radio\" name=\"module\" value=\"ap\">access point</p>\n"
              "            <p> <INPUT type=\"text\" name=\"server\" value=\"";
   webPage = webPage + dashAddress;
@@ -200,13 +217,22 @@ void startServer() {
     server.send(200, "text/html", webPage);
     delay(1000);
   });
+  server.on("/reset", []() {
+    Serial.println("Settings reset");
+    resetSettings();
+    saveConfig();
+    configureWebPage();
+    server.send(200, "text/html", webPage);
+    delay(1000);
+  });
   server.on("/save_config", []() {
     Serial.println("saveConfig");
     saveConfig();
     configureWebPage();
     server.send(200, "text/html", webPage);
     delay(1000);
-  });  server.on("/load_config", []() {
+  });  
+  server.on("/load_config", []() {
     Serial.println("loadConfig");
     loadConfig();
     configureWebPage();
@@ -215,8 +241,20 @@ void startServer() {
   });
   server.on("/action", []() {
     Serial.println("Action POST");
-    postActionAlarm();
+    ActivateAlarm();
     server.send(200, "text/html", "Action POST");
+    delay(1000);
+  });
+  server.on("/activate", []() {
+    Serial.println("Relay activated");
+    ActivateAlarm();
+    server.send(200, "text/html", "Relay activated");
+    delay(1000);
+  });
+  server.on("/deactivate", []() {
+    Serial.println("Relay deactivated");
+    DeactivateAlarm();
+    server.send(200, "text/html", "Relay deactivated");
     delay(1000);
   });
   server.on("/", []() {
@@ -227,6 +265,7 @@ void startServer() {
     String tmpNetworkSsid = server.arg("ssid").length() > 0 ? server.arg("ssid") : networkSsid;
     String tmpNetworkUser = server.arg("user").length() > 0 ? server.arg("user") : networkUser;
     String tmpNetworkPassword = server.arg("password").length() > 0 ? server.arg("password") : networkPassword;
+    String tmpNetworkIP = server.arg("ip").length() > 0 ? server.arg("ip") : networkIP;
     String tmpDashToken = server.arg("token").length() > 0 ? server.arg("token") : dashToken;
     String tmpModuleType = server.arg("module").length() > 0 ? server.arg("module") : moduleType;
     String tmpDashAddress = server.arg("server").length() > 0 ? server.arg("server") : dashAddress;
@@ -242,6 +281,14 @@ void startServer() {
     if (tmpNetworkPassword.length() != 0) {
       networkPassword = tmpNetworkPassword;
     }
+    if (tmpNetworkIP.length() != 0) {
+      networkIP = tmpNetworkIP;
+    }
+    if (tmpDashToken.length() != 0 && tmpDashToken != "SmartHome") {
+      dashToken = tmpDashToken;
+    } else {
+      dashToken = ownSsid;
+    }
     if (tmpModuleType.length() != 0) {
       if (tmpModuleType != moduleType) {
         moduleType = tmpModuleType;
@@ -252,11 +299,6 @@ void startServer() {
           dashAddress = tmpDashAddress;
         }
       }
-    }
-    if (tmpDashToken.length() != 0 && tmpDashToken != "SmartHome") {
-      dashToken = tmpDashToken;
-    } else {
-      dashToken = ownSsid;
     }
     if (tmpDashAddress.length() != 0) {
       dashAddress = tmpDashAddress;
@@ -305,6 +347,9 @@ void connectToWifi(String ssid,  String password) {
         counter++;
       }
       if (status == WL_CONNECTED) {
+        if (networkIP.length() > 0) {
+          WiFi.config(string2IP(networkIP), WiFi.gatewayIP(), WiFi.subnetMask());
+        }
         networkIP =  String(WiFi.localIP()[0]) + "." + String(WiFi.localIP()[1]) + "." + String(WiFi.localIP()[2]) + "." + String(WiFi.localIP()[3]);
         Serial.println("NodeMCU connected to the network: " + ssid + " with password: " + ownPassword);
         netConnectExceptionCounter = 0;
@@ -338,11 +383,11 @@ void postModuleAttributes() {
   postAttribute("InternetSSID", networkSsid);
   postAttribute("InternetUser", networkUser);
   postAttribute("InternetPassword", networkPassword);
+  postAttribute("InternetIP", networkIP);
   postAttribute("InternetStatus", String(status));
   postAttribute("ModuleType", moduleType);
   postAttribute("ThingsBoardAddress", "http://" + dashAddress + "/");
-  postAttribute("ThingsBoardToken", dashToken);
-  postAttribute("InternetIP", networkIP);
+  postAttribute("ThingsBoardToken", getTokenValue());
   isAttributesSet = true;
 }
 
@@ -434,10 +479,15 @@ int getCO2Data() {
   return result;
 }
 
-
-void postActionAlarm() {
+void ActivateAlarm() {
   isAttributesSet = false;
-  postAttribute("Alarm", "activate");
+  postAttribute("AlarmStatus", "activated");
+  isAttributesSet = true;
+}
+
+void DeactivateAlarm() {
+  isAttributesSet = false;
+  postAttribute("AlarmStatus", "deactivated");
   isAttributesSet = true;
 }
 
@@ -532,7 +582,7 @@ void sendPost(String message, String serverPoint) {
 }
 
 String getTokenValue() {
-  Serial.print(" -> ");
+  Serial.print("token -> ");
   String value;
   if (moduleType.length() != 0 && moduleType != "ap") {
     value = "SH(" + moduleType + ")";
@@ -546,6 +596,25 @@ String getTokenValue() {
   return value;
 }
 
+
+IPAddress string2IP(String strIP) {
+  int Parts[4] = {0, 0, 0, 0};
+  int Part = 0;
+
+  for ( int i = 0; i < strIP.length(); i++ )
+  {
+    char c = strIP[i];
+    if ( c == '.' )
+    {
+      Part++;
+      continue;
+    }
+    Parts[Part] *= 10;
+    Parts[Part] += c - '0';
+  }
+  IPAddress ip(Parts[0], Parts[1], Parts[2], Parts[3]);
+  return  ip;
+}
 
 //Store values
 
