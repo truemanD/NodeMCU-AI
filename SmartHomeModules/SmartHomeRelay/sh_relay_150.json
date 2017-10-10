@@ -1,0 +1,18 @@
+{
+  "apiToken": "SH(relay)150",
+  "name": "SH(relay)150",
+  "clazz": "org.thingsboard.server.extensions.rest.plugin.RestApiCallPlugin",
+  "publicAccess": false,
+  "state": "SUSPENDED",
+  "configuration": {
+    "port": 80,
+    "basePath": "/",
+    "userName": "diyanov.alex@gmail.com",
+    "password": "ARjOwI23",
+    "host": "192.168.1.150",
+    "authMethod": "NO_AUTH"
+  },
+  "additionalInfo": {
+    "description": "SH_controller"
+  }
+}

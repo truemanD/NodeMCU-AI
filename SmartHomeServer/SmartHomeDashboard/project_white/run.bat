@@ -1,1 +1,0 @@
-smashing start -p 5000 >> log.txt
