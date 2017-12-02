@@ -1,3 +1,5 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
 #include <SoftwareSerial.h>
 #include <Adafruit_Sensor.h>
 #include <DHT.h>
@@ -9,11 +11,13 @@
 #include <ArduinoJson.h>
 #include "FS.h"
 
-#define DHTPIN            2         // Pin which is connected to the DHT sensor.
+#define DHTPIN            2         // D4
+#define PIN_RX  13           //D7
+#define PIN_TX  15           //D8
+//D1 - SCL, D2 - SDA
 #define DHTTYPE           DHT11     // DHT 11 
-#define PIN_RX  4           //D2
-#define PIN_TX  5           //D1
 
+LiquidCrystal_I2C lcd(0x27, 16, 2); // set the LCD address to 0x27 for a 16 chars and 2 line display
 DHT_Unified dht(DHTPIN, DHTTYPE);
 ADC_MODE(ADC_VCC); //vcc read
 SoftwareSerial mySerial(PIN_RX, PIN_TX); // RX,TX
@@ -70,6 +74,10 @@ String webPage = "";
 void setup() {
   Serial.begin(9600);
   Serial.println();
+  lcd.init();
+  lcd.backlight();
+  lcd.setCursor(0, 0);
+  lcd.print("Senors started..");
 
   //  initDefNetwork();
 
@@ -116,6 +124,10 @@ void initDefNetwork() {
   moduleType = "sensors"; //default Type
   dashAddress = "171.25.167.194:8082"; //default Address
   dashToken = "SmartHome"; //default Token
+  lcd.setCursor(0, 0);
+  lcd.print("                ");
+  lcd.setCursor(0, 0);
+  lcd.print("Def network inited");
 }
 
 void resetSettings() {
@@ -130,6 +142,10 @@ void resetSettings() {
   moduleType = "ap";
   dashAddress = "";
   dashToken = "SmartHome";
+  lcd.setCursor(0, 0);
+  lcd.print("                ");
+  lcd.setCursor(0, 0);
+  lcd.print("Settings reseted");
 }
 
 void initSensors() {
@@ -138,6 +154,10 @@ void initSensors() {
   dht.temperature().getSensor(&sensor);
   dht.humidity().getSensor(&sensor);
   delayMS = sensor.min_delay / 1000;
+  lcd.setCursor(0, 0);
+  lcd.print("                ");
+  lcd.setCursor(0, 0);
+  lcd.print("Sensors inited");
 }
 
 void createAccessPoint() {
@@ -155,6 +175,14 @@ void createAccessPoint() {
     Serial.println(statusAP);
     ownIP = String(WiFi.softAPIP()[0]) + "." + String(WiFi.softAPIP()[1]) + "." + String(WiFi.softAPIP()[2]) + "." + String(WiFi.softAPIP()[3]);
     startServer();
+    lcd.setCursor(0, 0);
+    lcd.print("                ");
+    lcd.setCursor(0, 0);
+    lcd.print("AP 192.168.4.1");
+    lcd.setCursor(0, 1);
+    lcd.print("                ");
+    lcd.setCursor(0, 1);
+    lcd.print(statusAP);
   }
 }
 
@@ -165,6 +193,10 @@ void disableAccessPoint() {
   statusAP = 0;
   isAttributesSet = false;
   Serial.println("ESP AccessPoint disabled");
+  lcd.setCursor(0, 0);
+  lcd.print("                ");
+  lcd.setCursor(0, 0);
+  lcd.print("AP disabled");
 }
 
 void configureWebPage() {
@@ -360,6 +392,14 @@ void connectToWifi(String ssid,  String password) {
         networkIP =  String(WiFi.localIP()[0]) + "." + String(WiFi.localIP()[1]) + "." + String(WiFi.localIP()[2]) + "." + String(WiFi.localIP()[3]);
         Serial.println("NodeMCU connected to the network: " + ssid + " with password: " + ownPassword);
         netConnectExceptionCounter = 0;
+        lcd.setCursor(0, 0);
+        lcd.print("                ");
+        lcd.setCursor(0, 0);
+        lcd.print("Connected to:");
+        lcd.setCursor(0, 1);
+        lcd.print("                ");
+        lcd.setCursor(0, 1);
+        lcd.print(ssid);
       } else {
         Serial.println("NodeMCU NOT connected to the network");
         netConnectExceptionCounter = netConnectExceptionCounter + 1;
@@ -380,14 +420,30 @@ void disconnectFromWifi() {
   status = WiFi.disconnect();
   isSavedParams = false;
   Serial.println("Disconnected form wifi");
+  lcd.setCursor(0, 0);
+  lcd.print("                ");
+  lcd.setCursor(0, 0);
+  lcd.print("Disconnected form wifi");
 }
 
 void postModuleAttributes() {
+  lcd.setCursor(0, 0);
+  lcd.print("                ");
+  lcd.setCursor(0, 0);
+  lcd.print("Post attributes");
   postAttribute("OwnNetworkSSID", tmpOwnSsid);
+  lcd.setCursor(0, 1);
+  lcd.print("                ");
+  lcd.setCursor(0, 1);
+  lcd.print(tmpOwnSsid);
   postAttribute("OwnNetworkPassord", ownPassword);
   postAttribute("OwnNetworkStatus", String(apUpFlag));
   postAttribute("OwnIP", "http://" + ownIP + "/");
   postAttribute("InternetSSID", networkSsid);
+  lcd.setCursor(0, 1);
+  lcd.print("                ");
+  lcd.setCursor(0, 1);
+  lcd.print(networkSsid);
   postAttribute("InternetUser", networkUser);
   postAttribute("InternetPassword", networkPassword);
   postAttribute("InternetIP", networkIP);
@@ -443,6 +499,15 @@ void postSensorsValues() {
     Serial.print("CO2: " + String(ppm) + "PPM; ");
     Serial.print("Voltage: " + String(vdd) + "V;");
     Serial.println();
+
+    lcd.setCursor(0, 0);
+    lcd.print("                ");
+    lcd.setCursor(0, 0);
+    lcd.print("T: "); lcd.print(temp); lcd.print("*C");
+    lcd.setCursor(0, 1);
+    lcd.print("                ");
+    lcd.setCursor(0, 1);
+    lcd.print("H"); lcd.print(humid); lcd.print("%");
     t_temp = temp;
     t_humid = humid;
     t_vdd = vdd;
