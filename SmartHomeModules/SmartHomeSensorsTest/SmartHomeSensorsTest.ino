@@ -96,10 +96,6 @@ void updateSensorsValues() {
     ppm = getCO2Data();
   }
 
-
-  //lcd.setCursor(1,0);
-  //  lcd.print(humid+" H" + vdd +" V");
-
   t_temp = temp;
   t_humid = humid;
   t_vdd = vdd;
@@ -146,7 +142,6 @@ int getCO2Data() {
   crc++;
   // End of CRC check
   if ( !(response[0] == 0xFF && response[1] == 0x86 && response[8] == crc) ) {
-    //Serial.println("CRC error: " + String(crc) + " / " + String(response[8]));
     char raw[32];
     sprintf(raw, "RAW: %02X %02X %02X %02X %02X %02X %02X %02X %02X", response[0], response[1], response[2], response[3], response[4], response[5], response[6], response[7], response[8]);
     Serial.println("CRC error: " + String(crc) + " / " + String(response[8]));
@@ -155,16 +150,9 @@ int getCO2Data() {
     unsigned int responseHigh = (unsigned int) response[2];
     unsigned int responseLow = (unsigned int) response[3];
     int ppm = (256 * responseHigh) + responseLow;
-    //    int temp = response[4] - 20;
     char raw[32];
     sprintf(raw, "RAW: %02X %02X %02X %02X %02X %02X %02X %02X %02X", response[0], response[1], response[2], response[3], response[4], response[5], response[6], response[7], response[8]);
-    //    Serial.println(raw);
-//    if (ppm <= 400 || ppm > 4900) {
-//      Serial.println("CO2: no valid data");
-//      result = -2;
-//    } else {
       result = ppm;
-//    }
   }
   return result;
 }
@@ -172,7 +160,6 @@ int getCO2Data() {
 
 void disableAccessPoint() {
   Serial.println("Disabling access point!");
-  //  Serial.println(tmpOwnSsid);
   WiFi.softAPdisconnect(true);
   Serial.println("ESP AccessPoint disabled");
 }
